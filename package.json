@@ -1,0 +1,107 @@
+{
+  "name": "elsewhen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A desktop studio for impossible worlds and interactive fiction",
+  "author": "Impshial",
+  "main": "out/main/index.js",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "pnpm typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
+    "package": "pnpm build && electron-builder --dir",
+    "package:win": "pnpm build && electron-builder --win nsis portable",
+    "validate:examples": "tsx scripts/validate-examples.ts",
+    "eval:parser": "tsx scripts/eval-parser.ts",
+    "stress": "tsx scripts/stress.ts",
+    "generate:example": "tsx scripts/generate-example.ts",
+    "format": "prettier --write .",
+    "build:icon": "node scripts/build-icon.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
+    "fflate": "0.8.3",
+    "lucide-react": "1.57.0",
+    "openai": "7.34.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "three": "0.186.1",
+    "zod": "4.6.7",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0",
+    "eslint": "10.12.0",
+    "prettier": "3.9.10",
+    "sharp": "0.35.5",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.4"
+  },
+  "build": {
+    "appId": "com.elsewhen.studio",
+    "productName": "ElseWhen",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "examples",
+        "to": "examples"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signExecutable": false,
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "fileAssociations": [
+      {
+        "ext": "elsegame",
+        "name": "ElseWhen Game",
+        "role": "Viewer"
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    }
+  },
+  "license": "UNLICENSED"
+}

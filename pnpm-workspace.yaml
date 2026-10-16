@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+allowBuilds:
+  electron: true
+  electron-winstaller: false
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@react-three/fiber@9.8.2'
+  - openai@7.34.0
+

@@ -1,0 +1,31 @@
+{
+  "format": "elsewhen-scenarios",
+  "scenarios": [
+    {
+      "commands": [
+        "take lantern",
+        "go stone arch",
+        "take shard",
+        "go stone arch",
+        "go spiral stair",
+        "open case",
+        "take token from case",
+        "unlock brass gate with token",
+        "open brass gate",
+        "go brass gate",
+        "read star chart",
+        "go brass gate",
+        "go spiral stair",
+        "use shard on anchor",
+        "go wormhole",
+        "go silver thread",
+        "say \"Meridian\" to prism console",
+        "go horizon seam"
+      ],
+      "ending": "homeward",
+      "id": "scenario-homeward",
+      "name": "Find the way home"
+    }
+  ],
+  "schemaVersion": 1
+}

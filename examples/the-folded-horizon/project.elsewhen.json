@@ -1,0 +1,1209 @@
+{
+  "actions": [
+    {
+      "aliases": [
+        "say",
+        "speak"
+      ],
+      "description": "Speak supplied words to a reachable entity.",
+      "examples": [
+        "say \"hello\" to listener"
+      ],
+      "id": "speak",
+      "known": true,
+      "name": "Speak",
+      "notes": "",
+      "parameters": [
+        {
+          "capability": "",
+          "entityKind": "any",
+          "id": "text",
+          "kind": "text",
+          "name": "Words to speak",
+          "scope": "none"
+        },
+        {
+          "capability": "",
+          "entityKind": "any",
+          "id": "target",
+          "kind": "entity",
+          "name": "Listener",
+          "scope": "reachable"
+        }
+      ],
+      "privateExamples": [],
+      "refusal": "Your words fade without an answer.",
+      "turnCost": 1
+    }
+  ],
+  "author": "ElseWhen",
+  "characters": [
+    {
+      "aliases": [
+        "archivist"
+      ],
+      "description": "Ink stains their hands. Their eyes reflect a sky you cannot see.",
+      "fallback": "“Some things even the archive has forgotten.”",
+      "greeting": "“You are looking for a way through,” the Archivist says. “Start with the chart. It remembers what I cannot.”",
+      "id": "char-archivist",
+      "location": "loc-archive",
+      "name": "The Archivist",
+      "notes": "",
+      "properties": {},
+      "topics": [
+        {
+          "aliases": [
+            "observatory",
+            "stars",
+            "telescope"
+          ],
+          "condition": {
+            "conditions": [],
+            "kind": "all"
+          },
+          "description": "",
+          "effects": [],
+          "id": "topic-observatory",
+          "known": true,
+          "name": "The Observatory",
+          "notes": "",
+          "response": "“Read the name written between the stars. The chart will tell you what the observatory needs to hear.”"
+        },
+        {
+          "aliases": [
+            "gate"
+          ],
+          "condition": {
+            "conditions": [],
+            "kind": "all"
+          },
+          "description": "",
+          "effects": [],
+          "id": "topic-gate",
+          "known": true,
+          "name": "The Brass Gate",
+          "notes": "",
+          "response": "“Some doors ask for a key. Others ask you to listen.”"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "aliases": [
+        "arch",
+        "cavern"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-nexus",
+      "id": "exit-arch",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Stone Arch",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-arch-back",
+      "to": "loc-cavern",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "arch",
+        "nexus"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-cavern",
+      "id": "exit-arch-back",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Stone Arch",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-arch",
+      "to": "loc-nexus",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "stair",
+        "stairs"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-nexus",
+      "id": "exit-stair",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Spiral Stair",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-stair-back",
+      "to": "loc-gate",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "stair",
+        "stairs"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-gate",
+      "id": "exit-stair-back",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Spiral Stair",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-stair",
+      "to": "loc-nexus",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "gate"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "obj-gate",
+      "enabled": true,
+      "from": "loc-gate",
+      "id": "exit-gate",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Brass Gate",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-gate-back",
+      "to": "loc-archive",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "gate"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "obj-gate",
+      "enabled": true,
+      "from": "loc-archive",
+      "id": "exit-gate-back",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Brass Gate",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-gate",
+      "to": "loc-gate",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": true,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": false,
+      "from": "loc-nexus",
+      "id": "exit-wormhole",
+      "inDark": true,
+      "kind": "wormhole",
+      "name": "Wormhole",
+      "notes": "",
+      "order": 0,
+      "revealDestination": true,
+      "reverseId": "",
+      "to": "loc-echo",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "fold",
+        "return"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-echo",
+      "id": "exit-return",
+      "inDark": true,
+      "kind": "wormhole",
+      "name": "Return Fold",
+      "notes": "",
+      "order": 0,
+      "revealDestination": true,
+      "reverseId": "",
+      "to": "loc-nexus",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "thread"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-echo",
+      "id": "exit-thread",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Silver Thread",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-thread-back",
+      "to": "loc-observatory",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "thread"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": true,
+      "from": "loc-observatory",
+      "id": "exit-thread-back",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Silver Thread",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "exit-thread",
+      "to": "loc-echo",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "aliases": [
+        "seam"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": true,
+      "departure": "",
+      "description": "",
+      "direction": "",
+      "doorId": "",
+      "enabled": false,
+      "from": "loc-observatory",
+      "id": "exit-seam",
+      "inDark": true,
+      "kind": "rift",
+      "name": "Horizon Seam",
+      "notes": "",
+      "order": 0,
+      "revealDestination": false,
+      "reverseId": "",
+      "to": "loc-shore",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    }
+  ],
+  "description": "An impossible world. A name written between the stars. A way home.",
+  "failedAttemptsCostTurn": true,
+  "format": "elsewhen-project",
+  "id": "world-folded-horizon",
+  "intro": "You have followed the signal beyond the edge of every chart. Here, distance is a matter of memory, and the horizon folds back on itself. Somewhere in this strange world, a way home is waiting.",
+  "locations": [
+    {
+      "aliases": [],
+      "category": "Confluence",
+      "color": "#edbd62",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "A ring of dark stone hangs in a vast, quiet chamber. At its center, a forked anchor cradles a thread of pale light. A stone arch leads into the earth; a spiral stair winds out of sight.",
+      "icon": "orbit",
+      "id": "loc-nexus",
+      "name": "Nexus",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "region": "",
+      "tags": [],
+      "variants": [
+        {
+          "condition": {
+            "key": "",
+            "kind": "compare",
+            "op": "eq",
+            "ref": "var-wormhole",
+            "source": "variable",
+            "value": "Active"
+          },
+          "id": "desc-active",
+          "mode": "append",
+          "priority": 0,
+          "text": "A violet seam holds steady beside the anchor. Beyond it, distant voices arrive before they are spoken."
+        }
+      ]
+    },
+    {
+      "aliases": [
+        "cavern"
+      ],
+      "category": "Cavern",
+      "color": "#26c8d2",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "Pale crystals rise from the cavern floor. A low hum gathers in the spaces between them. One small shard shines with a rhythm that seems almost familiar.",
+      "icon": "gem",
+      "id": "loc-cavern",
+      "name": "Crystal Cavern",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        -1,
+        -1,
+        5
+      ],
+      "region": "Below the Nexus",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "aliases": [],
+      "category": "Place",
+      "color": "#eeb45e",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "A brass gate divides the chamber, its lock shaped like a branching star. Beside it rests a weathered metal case. The spiral stair returns to the Nexus.",
+      "icon": "door",
+      "id": "loc-gate",
+      "name": "Gate Chamber",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        -6,
+        -0.5,
+        1
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "aliases": [],
+      "category": "Archive",
+      "color": "#59a9ef",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "Shelves descend into water as still as glass. Above the tide line, a chart of impossible stars lies beside two ledgers. An Archivist tends the remnants of a history that has not happened yet.",
+      "icon": "book",
+      "id": "loc-archive",
+      "name": "Sunken Archive",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        6,
+        0.2,
+        1
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "aliases": [],
+      "category": "Dimension",
+      "color": "#b587ef",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "You stand inside the echo of a place. Distant voices arrive before they are spoken. A silver thread stretches toward a small observatory, suspended in the unmade sky.",
+      "icon": "orbit",
+      "id": "loc-echo",
+      "name": "Echo Dimension",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        4,
+        2,
+        -5
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "aliases": [],
+      "category": "Observatory",
+      "color": "#9c86e8",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "The telescope points inward, toward a sky contained in a single prism. A console waits beneath it, listening. The silver thread returns through the dark.",
+      "icon": "telescope",
+      "id": "loc-observatory",
+      "name": "Observatory",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        -5,
+        2,
+        -5
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "aliases": [],
+      "category": "Possibility",
+      "color": "#62b9da",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "A shore of smooth white stones meets an ocean without a horizon. For the first time since you arrived, the wind sounds like the world you remember.",
+      "icon": "waves",
+      "id": "loc-shore",
+      "name": "Silent Shore",
+      "notes": "",
+      "pinned": false,
+      "position": [
+        5,
+        -1,
+        7
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    }
+  ],
+  "notes": "",
+  "objects": [
+    {
+      "active": true,
+      "aliases": [
+        "lantern",
+        "light"
+      ],
+      "capabilities": [
+        "portable",
+        "light"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A compact survey lantern with a steady blue flame. It needs no fuel.",
+      "id": "obj-lantern",
+      "keyId": "",
+      "locked": false,
+      "name": "Survey Lantern",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-nexus",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "shard",
+        "crystal"
+      ],
+      "capabilities": [
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "The shard pulses in your hand. Its forked base looks as if it belongs in a cradle.",
+      "id": "obj-shard",
+      "keyId": "",
+      "locked": false,
+      "name": "Resonance Shard",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-cavern",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "anchor",
+        "cradle"
+      ],
+      "capabilities": [
+        "scenery"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A forked cradle waits at its center, two prongs threaded with pale light.",
+      "id": "obj-anchor",
+      "keyId": "",
+      "locked": false,
+      "name": "Wormhole Anchor",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-nexus",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "case",
+        "box"
+      ],
+      "capabilities": [
+        "container",
+        "openable"
+      ],
+      "capacity": 4,
+      "concealed": false,
+      "description": "A weathered metal case rests against the wall. Its simple brass latch lifts easily.",
+      "id": "obj-case",
+      "keyId": "",
+      "locked": false,
+      "name": "Sealed Case",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-gate",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "token",
+        "key"
+      ],
+      "capabilities": [
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A small token marked with a branching star. Its edges are worn smooth by countless hands.",
+      "id": "obj-token",
+      "keyId": "",
+      "locked": false,
+      "name": "Brass Token",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "obj-case",
+        "kind": "inside"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "gate"
+      ],
+      "capabilities": [
+        "door",
+        "openable",
+        "lockable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A heavy brass gate, with a star-shaped keyhole.",
+      "id": "obj-gate",
+      "keyId": "obj-token",
+      "locked": true,
+      "name": "Brass Gate",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "exit-gate",
+        "kind": "connection"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "chart"
+      ],
+      "capabilities": [
+        "readable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "Thin silver lines connect stars that no longer exist.",
+      "id": "obj-chart",
+      "keyId": "",
+      "locked": false,
+      "name": "Star Chart",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-archive",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "The observatory listens for a name. Speak Meridian to the Prism Console.",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "red book",
+        "book",
+        "red"
+      ],
+      "capabilities": [
+        "readable",
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A ledger bound in faded crimson.",
+      "id": "obj-red",
+      "keyId": "",
+      "locked": false,
+      "name": "Red Ledger",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-archive",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "We mapped every destination except the one we needed.",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "blue book",
+        "book",
+        "blue"
+      ],
+      "capabilities": [
+        "readable",
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A ledger the color of deep water.",
+      "id": "obj-blue",
+      "keyId": "",
+      "locked": false,
+      "name": "Blue Ledger",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-archive",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "A door can remember the hand that opens it. A world can remember a name.",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "aliases": [
+        "prism",
+        "console"
+      ],
+      "capabilities": [
+        "scenery"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "A small prism rests on a speaking plate. The plate is blank; the prism seems to be listening.",
+      "id": "obj-console",
+      "keyId": "",
+      "locked": false,
+      "name": "Prism Console",
+      "notes": "",
+      "open": false,
+      "placement": {
+        "id": "loc-observatory",
+        "kind": "location"
+      },
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    }
+  ],
+  "rules": [
+    {
+      "aliases": [],
+      "bindings": {
+        "target": "obj-anchor",
+        "tool": "obj-shard"
+      },
+      "condition": {
+        "key": "",
+        "kind": "compare",
+        "op": "eq",
+        "ref": "var-wormhole",
+        "source": "variable",
+        "value": "Dormant"
+      },
+      "description": "",
+      "effects": [
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "set",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "var-wormhole",
+          "text": "",
+          "value": "Active"
+        },
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "enable",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "exit-wormhole",
+          "text": "",
+          "value": true
+        },
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "reveal",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "exit-wormhole",
+          "text": "",
+          "value": null
+        },
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "print",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "",
+          "text": "You touch the shard to the cradle. Violet light threads between the prongs. Across the chamber, a seam opens into the Echo Dimension.",
+          "value": null
+        }
+      ],
+      "enabled": true,
+      "id": "rule-activate",
+      "name": "Activate wormhole",
+      "notes": "",
+      "once": false,
+      "order": 0,
+      "otherwise": "The wormhole is already steady. The shard has done its work.",
+      "phase": "handle",
+      "priority": 10,
+      "scope": "",
+      "trigger": "use"
+    },
+    {
+      "aliases": [],
+      "bindings": {
+        "target": "obj-console"
+      },
+      "condition": {
+        "key": "text",
+        "kind": "compare",
+        "op": "normalized",
+        "ref": "",
+        "source": "argument",
+        "value": "meridian"
+      },
+      "description": "",
+      "effects": [
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "set",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "var-horizon",
+          "text": "",
+          "value": true
+        },
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "enable",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "exit-seam",
+          "text": "",
+          "value": true
+        },
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "reveal",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "exit-seam",
+          "text": "",
+          "value": null
+        },
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "print",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "",
+          "text": "“Meridian.” The prism fills with morning light. A seam opens in the edge of the sky, and beyond it you hear the sea.",
+          "value": null
+        }
+      ],
+      "enabled": true,
+      "id": "rule-name",
+      "name": "Speak the name",
+      "notes": "",
+      "once": false,
+      "order": 0,
+      "otherwise": "The prism returns your words as a faint, unfinished echo.",
+      "phase": "handle",
+      "priority": 0,
+      "scope": "",
+      "trigger": "speak"
+    },
+    {
+      "aliases": [],
+      "bindings": {
+        "to": "loc-shore"
+      },
+      "condition": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "description": "",
+      "effects": [
+        {
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "end",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "homeward",
+          "text": "You step onto the shore. Behind you, the impossible sky folds itself into a single point of light. Ahead, a familiar road rises from the sand.\n\nYou have found your way home.",
+          "value": null
+        }
+      ],
+      "enabled": true,
+      "id": "rule-home",
+      "name": "Homeward",
+      "notes": "",
+      "once": true,
+      "order": 0,
+      "otherwise": "",
+      "phase": "event",
+      "priority": 0,
+      "scope": "",
+      "trigger": "enter"
+    }
+  ],
+  "schemaVersion": 1,
+  "seed": 4271,
+  "start": "loc-nexus",
+  "templates": [
+    {
+      "capabilities": [
+        "container",
+        "openable"
+      ],
+      "id": "type-container",
+      "name": "Container",
+      "parent": "",
+      "properties": []
+    },
+    {
+      "capabilities": [
+        "portable"
+      ],
+      "id": "type-item",
+      "name": "Portable item",
+      "parent": "",
+      "properties": []
+    },
+    {
+      "capabilities": [
+        "readable"
+      ],
+      "id": "type-readable",
+      "name": "Readable object",
+      "parent": "",
+      "properties": []
+    }
+  ],
+  "title": "The Folded Horizon",
+  "variables": [
+    {
+      "id": "var-wormhole",
+      "initial": "Dormant",
+      "max": null,
+      "min": null,
+      "name": "Wormhole state",
+      "notes": "",
+      "options": [
+        "Dormant",
+        "Active"
+      ],
+      "public": false,
+      "type": "enum"
+    },
+    {
+      "id": "var-horizon",
+      "initial": false,
+      "max": null,
+      "min": null,
+      "name": "Horizon open",
+      "notes": "",
+      "options": [],
+      "public": false,
+      "type": "boolean"
+    }
+  ],
+  "version": "1.0.0"
+}
