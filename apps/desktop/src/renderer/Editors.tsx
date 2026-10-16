@@ -1,10 +1,10 @@
+import { Chips, ActionForms, TryCommand } from './VocabularyEditor';
 import { useRef, useState } from 'react';
 import {
   always,
   capabilities,
   topicSchema,
   variantSchema,
-  parameterSchema,
   variableSchema,
   type Project,
   type Collection,
@@ -423,28 +423,55 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
             <div className="form-grid">
               <TextField label="Name" value={item.name} onChange={(v) => update('name', v)} />
               {'aliases' in item && (
-                <TextField
+                <Chips
                   label="Aliases"
-                  value={aliases.join(', ')}
-                  onChange={(v) =>
-                    update(
-                      'aliases',
-                      v
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    )
-                  }
+                  value={aliases}
+                  onChange={(v) => update('aliases', v)}
+                  hint="The display name is understood automatically. Add other player phrases here."
                 />
               )}
               {location && (
-                <TextField
-                  label="Category"
-                  value={location.category}
-                  onChange={(v) => update('category', v)}
-                />
+                <Field label="Location type" hint="Choose an existing type or enter a new one.">
+                  <input
+                    list="location-types"
+                    value={location.category}
+                    onChange={(e) => update('category', e.target.value)}
+                  />
+                  <datalist id="location-types">
+                    {[
+                      ...new Set([
+                        'Place',
+                        'Room',
+                        'Cavern',
+                        'Dimension',
+                        ...p.locations.map((l) => l.category),
+                      ]),
+                    ].map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
+                </Field>
               )}
             </div>
+            {'nouns' in item && (
+              <div className="form-grid">
+                <Chips
+                  label="Noun phrases"
+                  value={item.nouns}
+                  onChange={(v) => update('nouns', v)}
+                />
+                <Chips
+                  label="Adjectives"
+                  value={item.adjectives}
+                  onChange={(v) => update('adjectives', v)}
+                />
+                <Chips
+                  label="Plural forms"
+                  value={item.plurals}
+                  onChange={(v) => update('plurals', v)}
+                />
+              </div>
+            )}
             {object && (
               <PlacementFields value={object.placement} onChange={(v) => update('placement', v)} />
             )}
@@ -466,12 +493,22 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
             {location && (
               <>
                 <div className="form-grid">
-                  <TextField
-                    label="Region"
-                    value={location.region}
-                    onChange={(v) => update('region', v)}
-                    placeholder="No region"
-                  />
+                  <Field label="Region">
+                    <input
+                      aria-label="Region"
+                      list="world-regions"
+                      value={location.region}
+                      onChange={(e) => update('region', e.target.value)}
+                      placeholder="Choose or create a region"
+                    />
+                    <datalist id="world-regions">
+                      {[...new Set(p.locations.map((l) => l.region).filter(Boolean))].map(
+                        (region) => (
+                          <option key={region} value={region} />
+                        ),
+                      )}
+                    </datalist>
+                  </Field>
                   <TextField
                     label="Tags"
                     value={location.tags.join(', ')}
@@ -514,7 +551,7 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                 <div className="map-appearance">
                   <strong>Map appearance</strong>
                   <Select
-                    label="Icon"
+                    label="Map icon"
                     value={location.icon}
                     options={[
                       'pin',
@@ -528,7 +565,12 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                     ]}
                     onChange={(v) => update('icon', v)}
                   />
-                  <Colors value={location.color} onChange={(v) => update('color', v)} />
+                  <Field label="Map color">
+                    <Colors value={location.color} onChange={(v) => update('color', v)} />
+                  </Field>
+                  <span style={{ color: location.color }}>
+                    <Icon name={location.icon} /> {location.name}
+                  </span>
                 </div>
               </>
             )}
@@ -548,7 +590,24 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                   {capabilities.map((cap) => (
                     <Toggle
                       key={cap}
-                      label={cap[0].toUpperCase() + cap.slice(1)}
+                      label={
+                        {
+                          portable: 'Can be picked up',
+                          container: 'Can hold things inside',
+                          supporter: 'Can hold things on top',
+                          openable: 'Can be opened',
+                          lockable: 'Can be locked',
+                          wearable: 'Can be worn',
+                          readable: 'Has writing',
+                          light: 'Emits light',
+                          scenery: 'Part of the scenery',
+                          door: 'Connects two places',
+                          switchable: 'Can be switched on/off',
+                          edible: 'Can be eaten',
+                          drinkable: 'Can be drunk',
+                          enterable: 'Can be entered',
+                        }[cap]
+                      }
                       checked={object.capabilities.includes(cap)}
                       onChange={(v) =>
                         update(
@@ -579,6 +638,31 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
             )}
             {character && (
               <>
+                <Select
+                  label="Character pronouns"
+                  value={character.pronouns[0] ?? 'they'}
+                  options={[
+                    { value: 'they', label: 'They / them' },
+                    { value: 'she', label: 'She / her' },
+                    { value: 'he', label: 'He / him' },
+                  ]}
+                  onChange={(v) => update('pronouns', [v])}
+                />
+                <Toggle
+                  label="Possessions are visible"
+                  checked={character.possessionsVisible}
+                  onChange={(v) => update('possessionsVisible', v)}
+                />
+                <Toggle
+                  label="Allows player to take possessions"
+                  checked={character.allowsTaking}
+                  onChange={(v) => update('allowsTaking', v)}
+                />
+                <Toggle
+                  label="Accepts gifts by default"
+                  checked={character.acceptsGifts}
+                  onChange={(v) => update('acceptsGifts', v)}
+                />
                 <RichText
                   label="Greeting"
                   value={character.greeting}
@@ -614,8 +698,23 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                     value={connection.kind}
                     onChange={(v) => update('kind', v)}
                   />
-                  <TextField
-                    label="Compass alias (optional)"
+                  <Select
+                    options={[
+                      '',
+                      'north',
+                      'northeast',
+                      'east',
+                      'southeast',
+                      'south',
+                      'southwest',
+                      'west',
+                      'northwest',
+                      'up',
+                      'down',
+                      'in',
+                      'out',
+                    ]}
+                    label="Travel direction (optional)"
                     value={connection.direction}
                     onChange={(v) => update('direction', v)}
                   />
@@ -753,6 +852,7 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                   <ScalarInput
                     label="Initial value"
                     type={variable.type}
+                    definition={variable}
                     value={variable.initial}
                     onChange={(v) => update('initial', v)}
                   />
@@ -795,79 +895,8 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                     onChange={(v) => update('known', v)}
                   />
                 </div>
-                <h4>Parameters</h4>
-                {action.parameters.map((param, i) => (
-                  <div className="parameter-row" key={i}>
-                    <TextField
-                      label="Parameter ID"
-                      value={param.id}
-                      onChange={(v) =>
-                        update(
-                          'parameters',
-                          action.parameters.map((p, j) => (i === j ? { ...p, id: v } : p)),
-                        )
-                      }
-                    />
-                    <TextField
-                      label="Label"
-                      value={param.name}
-                      onChange={(v) =>
-                        update(
-                          'parameters',
-                          action.parameters.map((p, j) => (i === j ? { ...p, name: v } : p)),
-                        )
-                      }
-                    />
-                    <Select
-                      label="Type"
-                      value={param.kind}
-                      options={['entity', 'connection', 'topic', 'text', 'number', 'boolean']}
-                      onChange={(v) =>
-                        update(
-                          'parameters',
-                          action.parameters.map((p, j) => (i === j ? { ...p, kind: v } : p)),
-                        )
-                      }
-                    />
-                    <Select
-                      label="Scope"
-                      value={param.scope}
-                      options={['known', 'visible', 'reachable', 'carried', 'accessible', 'none']}
-                      onChange={(v) =>
-                        update(
-                          'parameters',
-                          action.parameters.map((p, j) => (i === j ? { ...p, scope: v } : p)),
-                        )
-                      }
-                    />
-                    <Button
-                      icon="trash"
-                      title="Remove parameter"
-                      onClick={() =>
-                        update(
-                          'parameters',
-                          action.parameters.filter((_, j) => i !== j),
-                        )
-                      }
-                    />
-                  </div>
-                ))}
-                <Button
-                  icon="plus"
-                  variant="outline"
-                  onClick={() =>
-                    update('parameters', [
-                      ...action.parameters,
-                      parameterSchema.parse({
-                        id: `parameter${action.parameters.length + 1}`,
-                        name: 'Target',
-                        kind: 'entity',
-                      }),
-                    ])
-                  }
-                >
-                  Parameter
-                </Button>
+                <ActionForms action={action} />
+                <TryCommand project={p} />
                 <TextField
                   label="Default refusal"
                   value={action.refusal}
@@ -879,16 +908,6 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                   value={action.examples.join('\n')}
                   onChange={(v) => update('examples', v.split('\n'))}
                 />
-                <TextField
-                  label="Private parser test examples (never sent to OpenAI)"
-                  multiline
-                  value={action.privateExamples.join('\n')}
-                  onChange={(v) => update('privateExamples', v.split('\n'))}
-                />
-                <p className="hint">
-                  Local form: alias value | value. Parameters follow the order above. Speak also
-                  supports say “words” to target.
-                </p>
               </>
             )}
             {template && (
@@ -909,7 +928,24 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                   {capabilities.map((cap) => (
                     <Toggle
                       key={cap}
-                      label={cap}
+                      label={
+                        {
+                          portable: 'Can be picked up',
+                          container: 'Can hold things inside',
+                          supporter: 'Can hold things on top',
+                          openable: 'Can be opened',
+                          lockable: 'Can be locked',
+                          wearable: 'Can be worn',
+                          readable: 'Has writing',
+                          light: 'Emits light',
+                          scenery: 'Part of the scenery',
+                          door: 'Connects two places',
+                          switchable: 'Can be switched on/off',
+                          edible: 'Can be eaten',
+                          drinkable: 'Can be drunk',
+                          enterable: 'Can be entered',
+                        }[cap]
+                      }
                       checked={template.capabilities.includes(cap)}
                       onChange={(v) =>
                         update(
@@ -957,6 +993,7 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
                     <ScalarInput
                       label="Default"
                       value={prop.initial}
+                      definition={prop}
                       onChange={(initial) =>
                         update(
                           'properties',
@@ -993,7 +1030,24 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
               {capabilities.map((cap) => (
                 <Toggle
                   key={cap}
-                  label={cap}
+                  label={
+                    {
+                      portable: 'Can be picked up',
+                      container: 'Can hold things inside',
+                      supporter: 'Can hold things on top',
+                      openable: 'Can be opened',
+                      lockable: 'Can be locked',
+                      wearable: 'Can be worn',
+                      readable: 'Has writing',
+                      light: 'Emits light',
+                      scenery: 'Part of the scenery',
+                      door: 'Connects two places',
+                      switchable: 'Can be switched on/off',
+                      edible: 'Can be eaten',
+                      drinkable: 'Can be drunk',
+                      enterable: 'Can be entered',
+                    }[cap]
+                  }
                   checked={object.capabilities.includes(cap)}
                   onChange={(v) =>
                     update(
@@ -1008,33 +1062,50 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
             </div>
             <h4>Initial state</h4>
             <div className="capability-grid">
-              {(['open', 'locked', 'active', 'worn', 'concealed', 'transparent'] as const).map(
-                (key) => (
+              {(['open', 'locked', 'active', 'worn', 'concealed', 'transparent'] as const)
+                .filter(
+                  (key) =>
+                    key === 'concealed' ||
+                    object.capabilities.includes(
+                      {
+                        open: 'openable',
+                        locked: 'lockable',
+                        active: 'switchable',
+                        worn: 'wearable',
+                        transparent: 'container',
+                      }[key] as (typeof capabilities)[number],
+                    ) ||
+                    (key === 'active' && object.capabilities.includes('light')),
+                )
+                .map((key) => (
                   <Toggle
                     key={key}
                     label={key[0].toUpperCase() + key.slice(1)}
                     checked={object[key]}
                     onChange={(v) => update(key, v)}
                   />
-                ),
-              )}
+                ))}
             </div>
-            <Select
-              label="Key for lock"
-              value={object.keyId}
-              options={[
-                { value: '', label: 'No key' },
-                ...p.objects
-                  .filter((o) => o.id !== id)
-                  .map((o) => ({ value: o.id, label: o.name })),
-              ]}
-              onChange={(v) => update('keyId', v)}
-            />
-            <RichText
-              label="Readable text"
-              value={object.readText}
-              onChange={(v) => update('readText', v)}
-            />
+            {object.capabilities.includes('lockable') && (
+              <Select
+                label="Key for lock"
+                value={object.keyId}
+                options={[
+                  { value: '', label: 'No key' },
+                  ...p.objects
+                    .filter((o) => o.id !== id)
+                    .map((o) => ({ value: o.id, label: o.name })),
+                ]}
+                onChange={(v) => update('keyId', v)}
+              />
+            )}
+            {object.capabilities.includes('readable') && (
+              <RichText
+                label="Readable text"
+                value={object.readText}
+                onChange={(v) => update('readText', v)}
+              />
+            )}
             <h4>Visibility condition</h4>
             <ConditionEditor
               value={object.visibleWhen}
@@ -1079,22 +1150,36 @@ export function EntityEditor({ id, onAdd }: { id: string; onAdd: AddEntity }) {
             {Object.entries(props).map(([key, value]) => (
               <ScalarInput
                 key={key}
+                definition={[
+                  ...p.propertyDefinitions,
+                  ...p.templates.flatMap((t) => t.properties),
+                ].find((v) => v.id === key)}
                 label={
-                  p.templates.flatMap((t) => t.properties).find((v) => v.id === key)?.name ?? key
+                  [...p.propertyDefinitions, ...p.templates.flatMap((t) => t.properties)].find(
+                    (v) => v.id === key,
+                  )?.name ?? key
                 }
                 value={value}
                 onChange={(v) => update('properties', { ...props, [key]: v })}
               />
             ))}
-            <Button
-              icon="plus"
-              variant="outline"
-              onClick={() =>
-                update('properties', { ...props, [`property${Object.keys(props).length + 1}`]: '' })
-              }
-            >
-              Property override
-            </Button>
+            <Select
+              label="Add property override"
+              value=""
+              options={[
+                { value: '', label: 'Choose a declared property…' },
+                ...[...p.propertyDefinitions, ...p.templates.flatMap((t) => t.properties)]
+                  .filter((v) => !(v.id in props))
+                  .map((v) => ({ value: v.id, label: v.name })),
+              ]}
+              onChange={(id) => {
+                const def = [
+                  ...p.propertyDefinitions,
+                  ...p.templates.flatMap((t) => t.properties),
+                ].find((v) => v.id === id);
+                if (def) update('properties', { ...props, [id]: def.initial });
+              }}
+            />
             {object?.template && (
               <p className="hint">
                 Unspecified properties inherit from the reusable type. Capabilities are combined

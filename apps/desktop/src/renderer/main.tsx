@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { DetachedPlayer } from './DetachedPlayer';
 import './styles.css';
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string }> {
   state = { error: '' };
@@ -22,6 +23,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 }
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
-    <App />
+    {new URLSearchParams(location.search).has('player') ? <DetachedPlayer /> : <App />}
   </ErrorBoundary>,
 );

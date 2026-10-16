@@ -1,74 +1,49 @@
 # Implementation status
 
-ElseWhen 0.1.0 is a working Windows desktop development release, built from the supplied [product brief](build-brief.txt) and visual references. It includes a designer, deterministic player, optional OpenAI interpreter, original playable sample, light/dark themes, and Windows distribution artifacts. The main acceptance journeys are implemented and tested. The longer brief also describes refinements that remain; they are explicitly listed below.
+ElseWhen 0.2.0 replaces the prototype interpreter with a deterministic local IF engine. The [rewrite brief](local-engine-brief.txt) is the current specification; the [original brief](history/build-brief-v1.txt) is historical. The initial application was preserved and pushed as commit d4a7853 before this rewrite.
 
 ## Delivered
 
-| Area         | Implemented behavior                                                                                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop      | Native menus/dialogs, application icon, source projects, recent files, package entry, preferences, sandboxed renderer and narrow validated IPC                                                                                                          |
-| Authoring    | Locations, objects, containment, characters/dialogue, connections/reverse pairs/shared doors, typed variables, custom actions, inherited object types, properties, descriptions, references and draft validation                                        |
-| History      | Coalesced editor undo/redo, separate session undo/redo, immutable playtest snapshots, restart with source changes                                                                                                                                       |
-| Visual rules | Check/Handle/After/Event phases, bindings, recursive All/Any/Not conditions, typed comparisons, ordered effects, refusal, scheduling, seeded random branches, endings                                                                                   |
-| Map          | Perspective/orthographic views, orbit/pan/zoom, selection, Ctrl/Cmd additive selection, framing, translation gizmo, coordinate editing, snapping, connection creation, context creation, pinned auto-layout, region filtering, 2D and list alternatives |
-| Player       | Authored transcript, command history, inventory, discovered map with unknown destinations, exact-exit travel, search/export/font size, conventional commands, clarification, queues, save/restore and endings                                           |
-| Debugging    | Actual canonical intent, rules/effects, state diffs, public parser context, latency/usage, undoable designer controls, scenario execution                                                                                                               |
-| Persistence  | Schema validation, deterministic compile/export, atomic source writes, external-change checks, rolling backups, locks/read-only mode, saved-project and never-saved draft recovery, exact-revision game saves                                           |
-| OpenAI       | Official Responses API adapter, strict structured output, semantic validation, bounded public context, key/model settings, protected credential storage, cancellation/stale-result protection, opt-in evaluation                                        |
-| Sample       | The Folded Horizon: 7 locations, 10 objects, 11 directed connections, Archivist dialogue, 3 puzzle/event rules, custom Speak action, and a complete 18-command solution                                                                                 |
+- Version-two domain, compiled game and save formats, an explicit standard-action registry, vocabulary and grammar catalogs, bounded lexer/grammar matching, public-scope noun resolution, typed role validation, structured questions and discourse.
+- Directions, known destinations and shared doors; sequences, frozen lists, quantities/exclusions, pronouns, repeat selectors and per-action undo/redo.
+- Capability-based object behavior, containment/support, light, actor occupancy, NPC possession and typed properties, reversible consumption, pure requirements, replacement outcomes, After/Response rules, subordinate actions and deterministic per-turn event instances.
+- Visual vocabulary chips, command shapes, role constraints, verb synonyms, property/event/ending registries, contextual behavior controls and isolated scenario assertions. The existing 2D/3D world map and dark/light themes remain.
+- A complete native Game Player window backed by the same host session. Transfers preserve pending questions, input/history and presentation; the native renderer has reduced IPC privileges and receives no designer snapshot.
+- Copy-based migration, recoverable review records, exact-revision portable saves and atomic authoring storage. Settings migration retains recent projects/unrelated preferences and removes only the retired application credential file.
+- Two ordinary-data examples: The Folded Horizon and The Courtyard. The latter includes three rooms, a drawer/key/photo puzzle, shared door, lamp, transparent case, caretaker and custom bell interaction.
+- Production AI transport, SDK, key/model UI, provider IPC, environment-key handling and evaluation script removed. No API key is needed.
 
-## Verification on the development host
+## Verification
 
-Host: Windows 10 build 19045, x64, Intel Core i7-5820K at 3.30 GHz, 64 GiB memory. Shell tooling used Node 24.19.0; elevated desktop/package verification used Node 22.23.3. Electron 44.7.2 remains sandboxed.
+Host: Windows 10 build 19045, x64, Intel Core i7-5820K, 64 GiB memory. Electron renderer sandboxing and context isolation remain enabled.
 
-| Check                          | Result                                                                                                                                                                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dependency installation        | Pinned dependencies and pnpm lockfile installed; Electron runtime downloaded                                                                                                                                                 |
-| `pnpm typecheck`               | Passed                                                                                                                                                                                                                       |
-| `pnpm lint`                    | Passed                                                                                                                                                                                                                       |
-| `pnpm test`                    | 34 deterministic tests passed                                                                                                                                                                                                |
-| Actual Electron workflow suite | 7 workflows passed, including rotation/selection/themes/2D, GUI creation and connections, container interaction, edited rule tracing, full sample, package save/restore, scenarios/debug snapshots, and close/draft recovery |
-| `pnpm validate:examples`       | Passed: 18 commands, turn 17, ending `homeward`                                                                                                                                                                              |
-| `pnpm eval:parser`             | Confirmed opt-in/no-network behavior; no paid evaluation run                                                                                                                                                                 |
-| `pnpm build`                   | Main process, isolated preload and renderer built successfully                                                                                                                                                               |
-| `pnpm package:win`             | Windows x64 NSIS installer and portable executable built successfully, unsigned; executable metadata and icon applied                                                                                                        |
+Type checking, ESLint and the production Electron/Vite build pass. All 88 deterministic unit/integration tests pass, as do both generated example walkthroughs. The Folded Horizon completes 18 commands at turn 17 with ending homeward; The Courtyard completes nine commands at turn nine with Bell rung true.
 
-The Electron tests use isolated temporary application data and mock only native file-dialog path selection. They interact with the real renderer, IPC, compiler, parser, engine, and files. API transport tests mock OpenAI independently. No live model accuracy or provider-account connectivity claim is made.
+Eleven real Electron journeys cover themes/maps, blank-world creation and connections, source save/reopen/recovery, container behavior, visual rule editing, export/player save and restore, scenario/debug snapshots, GUI drawer/custom-verb authoring, vocabulary and typed property controls, settings migration and detached-player lifecycle. The enhanced native journey also tests saving a question, restore without execution, undo/redo, repeated transfer, restricted IPC, off-screen saved bounds and cancellation of application quit.
 
-The final unpacked **packaged executable** was also launched directly with an exported `.elsegame` argument. It reported `isPackaged: true`, loaded from `app.asar`, and completed all 18 walkthrough commands to the ending without renderer errors. This checks packaged startup and game-file argument handling, independently of the source runner. Reproduce with `node node_modules/tsx/dist/cli.mjs scripts/smoke-package.ts` after packaging.
+The packaged verification runner uses a blocked proxy and DNS resolution from launch, aborts HTTP(S) renderer requests, and supplies an empty API-key variable. It can run the same entire workflow suite against the actual Windows executable:
 
-## Scale fixture
+```powershell
+$env:ELSEWHEN_E2E_PACKAGED = '1'
+node node_modules/@playwright/test/cli.js test
+Remove-Item Env:ELSEWHEN_E2E_PACKAGED
+node node_modules/tsx/dist/cli.mjs scripts/smoke-package.ts
+```
 
-The fixture has 1,000 locations, 3,000 connections, 5,000 objects and 1,000 rules. Engine measurements in one host run:
+On 2026-10-16, all eleven journeys passed against the final packaged Windows executable with those network restrictions and zero HTTP(S) requests observed. The separate smoke script also passed command-line .elsegame loading and all 18 walkthrough commands. The process reported version 0.2.0, isPackaged true and an app.asar application path. Both the NSIS installer and portable executable were generated successfully.
 
-| Operation         |     Time |
-| ----------------- | -------: |
-| Compile           | 529.5 ms |
-| Start and observe | 129.4 ms |
-| Wait transaction  | 142.1 ms |
-| Player projection |  10.5 ms |
+The workflow tests exercise the real renderer, host, compiler, parser, engine and files. Native file dialogs are substituted only to choose temporary test paths; close-dialog responses are substituted to test cancellation. DNS/proxy blocking and HTTP(S) interception are per application, not a machine-wide firewall change. Production source, built output and the lockfile were also checked for retired provider imports and endpoints.
 
-The initial desktop profile exposed excessive draw calls: 83 ms median frame interval, 884 ms sampled 95th percentile, and 3,221 ms to switch to 2D. Large maps now use instanced nodes/arrows, batched line geometry, and selected-node labels; the SVG fallback reduces dense labels too. On the same host, a follow-up profile measured 1,544 ms opening the project, 17 ms median and 95th-percentile frame intervals over a short 20-frame sample, 394 ms switching to 2D, and 498 ms searching for an object. These are local observations, not hardware-independent performance promises or a sustained GPU benchmark.
+## Scale and practical limits
 
-Explorer collections are paged in groups of 100, validation is debounced, and scope lookups use entity indexes. Rule filtering and some containment/observation operations still scan collections. Further profiling should focus on long play sessions and editing large worlds with complex conditional logic.
+The 1,000-location / 3,000-connection / 5,000-object / 1,000-rule fixture completed on this host: compile 605 ms, start/observe 292 ms, Wait transaction 533 ms and player projection 16 ms. These are one local run, not sustained performance guarantees. The engine still scans some rule/containment collections. Large maps retain the existing batched rendering and paged explorer.
 
-A second instrumented run, with screenshot capture and renderer-error collection, also passed: 1,627 ms opening, 17/33 ms median/95th-percentile frame interval, 567 ms switching to 2D, and 834 ms search. The Windows package build was running concurrently during this measurement; the variation reinforces the limited scope of these samples.
+The parser supports explicit English command forms, not unrestricted natural language. Limits and turn semantics are documented in the [command reference](command-reference.md) and [engine semantics](engine-semantics.md). General interaction verbs require authored behavior; combat, multilingual grammar, voice, fluid/weight simulation and automatic long-distance routing are outside this rewrite.
 
-Reproduce with `pnpm stress --write`, then `node node_modules/tsx/dist/cli.mjs scripts/profile-desktop.ts` after building. The profile launches real Electron with a temporary profile and writes a stress-map screenshot under `test-results`. Close any prior profiling instance before reusing its generated source fixture.
+Version-one source upgrades require review and Save As; version-one progress saves require the original application. Portable saves deliberately start a new undo/redo baseline. Scenario edits require Save tests. Static validation is not a proof that a puzzle is solvable.
 
-## Remaining refinements and verification
+The Windows installer and portable executable are unsigned development builds. Installation/uninstallation and OS file-association registration have not been exercised. macOS/Linux builds, physical multi-monitor disconnects, full screen-reader access and high-DPI device coverage remain unverified. Window restoration clamps saved bounds to the current display work area.
 
-- The map's additive selection supports inspection/framing; translation acts on the active node. Group translation, a configurable arrangement plane, richer connection routing, and a full layout-constraint system remain. Dense maps deliberately simplify labels and concealed-edge styling.
-- Dialogue currently supports one conditional response per topic plus effects, greeting, and fallback. A dedicated multi-variant conversation preview and first-conversation effect editor remain. Authors can express extra behavior through action/event rules.
-- The debugger exposes actual runtime parsing, and scenarios run independently. A standalone parser playground, per-rule hypothetical-state test panel, arbitrary state assertions in the scenario editor, and exportable canonical replay journals remain.
-- Undo/redo restores runtime results without model calls. Persisted saves start a fresh undo history; there is no saved history-branch viewer. Scenario edits need **Save tests** before leaving their editor.
-- Source validation catches core references, placement/cycles, type chains, rule/event constraints and likely unreachable locations. It is not a complete static proof of puzzle solvability. Validation opens the owning editor, rather than focusing every nested field automatically.
-- Forms, controls, modals, focus indicators, reduced-motion styles and map lists are present. Full screen-reader testing, high-DPI/device coverage, and formal contrast auditing remain.
-- macOS/Linux configurations have not been built or run. Windows installer generation is verified; a full install/uninstall and file-association registration cycle has not been performed on this machine. Signing and public release publication are not performed.
-- Live OpenAI connection/evaluation awaits the owner's API configuration and opt-in billable run. Fixture and mocked-transport coverage is not a substitute for that verification.
+## Artifacts
 
-## Artifacts and source
-
-`release/ElseWhen Setup 0.1.0.exe` is the installer; `release/ElseWhen 0.1.0.exe` is the portable build; `release/win-unpacked/ElseWhen.exe` is the unpacked application. Generated binaries, dependencies, test results and private settings are excluded from Git.
-
-The repository contains all source, tests, schemas, the complete sample, icon source/generator, the original brief, and documentation. Use `pnpm dev` for development or the Windows artifacts to run without Node/pnpm.
+Windows outputs are release/ElseWhen Setup 0.2.0.exe, release/ElseWhen 0.2.0.exe and release/win-unpacked/ElseWhen.exe. Generated binaries, dependencies, profiles and test results stay outside Git. The user's existing ElseWhen.zip archive remains untouched.

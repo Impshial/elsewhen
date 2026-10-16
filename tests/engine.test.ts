@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { foldedHorizon, walkthrough } from '../examples/the-folded-horizon/sample';
 import { compile, validateProject } from '../packages/compiler/src/index';
 import { execute, startGame, projectPlayer, scope } from '../packages/engine/src/index';
-import { buildContext, conventional, toCanonical } from '../packages/parser/src/index';
+import { buildContext, interpret } from '../packages/parser/src/index';
 import { effect, always } from '../packages/domain/src/index';
 import { Session } from '../apps/desktop/src/main/session';
 describe('The Folded Horizon', () => {
@@ -81,17 +81,6 @@ describe('The Folded Horizon', () => {
     session.redo();
     expect(session.save()).toEqual(after);
   });
-  it('a stale provider response cannot act after cancellation', async () => {
-    const session = new Session(compile(foldedHorizon()), true);
-    let resolve!: (value: ReturnType<typeof conventional>) => void;
-    const response = new Promise<ReturnType<typeof conventional>>((r) => (resolve = r));
-    const pending = session.command('please hold this bright thing', { parse: () => response });
-    session.cancel();
-    resolve(conventional('take lantern', buildContext(session.view().view)));
-    await pending;
-    expect(session.state.turn).toBe(0);
-    expect(session.state.placements['obj-lantern'].kind).toBe('location');
-  });
   it('schedules delay one on the next consumed turn, not the scheduling turn', () => {
     const p = foldedHorizon();
     p.rules.push(
@@ -143,9 +132,9 @@ describe('The Folded Horizon', () => {
       kind: 'object',
       capabilities: ['portable'],
     };
-    const r = conventional('use shard on anchor', buildContext(projectPlayer(p, s))).result;
-    expect(r.kind).toBe('intent');
-    if (r.kind === 'intent')
-      expect(toCanonical(r).args).toEqual({ tool: 'obj-shard', target: 'obj-anchor' });
+    const r = interpret('use shard on anchor', buildContext(projectPlayer(p, s)));
+    expect(r.kind).toBe('resolved');
+    if (r.kind === 'resolved')
+      expect(r.actions[0].args).toEqual({ item: 'obj-shard', target: 'obj-anchor' });
   });
 });

@@ -1,44 +1,23 @@
-# Project and runtime formats
+# Formats and migration
 
-All persisted application formats have a format identifier and schema version. Version 1 is supported. An unsupported newer version is rejected without modifying the original source.
+## Source projects
 
-## Authoring project
+Version 2 .elsewhen.json files preserve stable entity IDs, descriptions, aliases, map positions, capabilities, typed properties, grammar forms and declarative rules. Runtime state is separate. Tests live in a sibling tests/scenarios.json file.
 
-`project.elsewhen.json` contains `ProjectDefinition`: project metadata, starting location, turn policy, seed, locations, objects, characters/topics, directed connections, variables, custom actions, rules, and reusable types. Every reference stores a stable ID, not a display name. The full Zod definitions are in `packages/domain/src/index.ts`.
+Opening a version-one project upgrades a copy. Legacy roles map to semantic item/instrument/recipient roles; recognized directions become canonical direction metadata. Unusual directions remain aliases and receive a review notice. The prototype speech action maps to built-in Say. Old descriptive examples remain descriptions, not executable grammar.
 
-Objects have exactly one placement: `location`, `inside`, `on`, `character`, `player`, `offstage`, or `connection`. A shared door uses connection placement and is referenced by both associated exits. Capability lists describe supported built-in operations. Properties contain serializable scalar values.
+Ambiguous legacy Put rules, ignored Check effects and ambiguous event captures block export until reviewed. Their original data is retained in migration records. Save As is required for upgraded files, preserving the original source. Future unsupported schemas fail without changing files.
 
-Conditions are `all`, `any`, or `not` groups, comparisons, and typed scope/state tests. Effects are ordered data records. They never execute program text. Explicit `order`, `priority`, and stable ID resolve rule ordering.
+## Compiled games
 
-Keys in serialized objects are sorted for readable, stable diffs. Arrays preserve authored ordering. Source saves use a temporary sibling file, flush, then rename. Before overwriting, the host compares the source fingerprint from the last load/save. External changes require saving a separate copy rather than silently replacing another editor's work.
+.elsegame is a bounded ZIP with exactly manifest.json and game.json. Runtime and manifest versions are 2. The compiler resolves reusable types, validates effective behavior, strips notes/private test examples/migration records and creates vocabulary/grammar catalogs. SHA-256 covers the versioned runtime semantics and data. Import recompiles and checks identity/hash. Duplicate, unexpected, unsafe and oversized archive entries are rejected.
 
-Ten previous versions are retained under the project folder's `.elsewhen/backups`. Debounced recovery snapshots live in ElseWhen's application-data `recovery` directory, keyed by a hash of project ID. Reopening offers a newer recovery snapshot. A sibling `.lock` records the opening process; another opener can select read-only mode or explicitly take over an abandoned lock.
+## Saves
 
-Never-saved drafts are listed on the welcome screen after restart. Recovery does not mark the restored source as saved. Save As acquires its destination lock before writing, so another active session's project cannot be overwritten through that route. Cancelled Quit operations retain the current source lock.
+Version-two .elsesave files contain game identity and exact runtime hash; placements and occupancy; object/character properties; discovery; variables; consumed entities; scheduled instance IDs and order; turn/RNG/ending; transcript; discourse/repeat state; and pending question plus suspended clauses.
 
-Scenario tests are stored separately in `tests/scenarios.json` with format `elsewhen-scenarios`. They are not exported. Unsaved projects use an application-data tests directory until their first source save.
+Restore validates a complete candidate before changing the session. Incompatible version-one saves require the original application. A successful restore starts a fresh undo history. A failed or canceled restore preserves the current session.
 
-## Migration policy
+## Storage
 
-`migrateProject` clones data before migration. The registry currently supports the prototype version 0 to version 1 transformation (`name` becomes `title`, and the current format marker is set). A unit test proves the old object is preserved. Future migrations must be ordered, tested with retained fixtures, and followed by complete schema validation.
-
-## Compiled game package
-
-An `.elsegame` is a ZIP with exactly:
-
-- `manifest.json`: `elsegame`, schema version, minimum runtime version, game ID, authored version, title, SHA-256 content hash.
-- `game.json`: `elsewhen-runtime`, schema/runtime versions, normalized project runtime definition, matching hash.
-
-Compilation removes note content and private parser examples. It resolves inherited object capability/property defaults. No credentials, local paths, user settings, scenario expectations, or editor history are exported. ZIP timestamps are fixed. Identical runtime content yields identical hashes and byte-identical packages.
-
-Local packages necessarily contain puzzle logic. The privacy boundary is the player projection and parser context, not archive obfuscation.
-
-## Portable saves
-
-`.elsesave` stores `elsesave`, schema version, game ID, exact runtime content hash, logical state, transcript, and referent memory. Restoration requires both identity and hash to match. It validates the state, cancels outstanding interpretation, clears pending clarification/queues, and starts a new undo/redo history. It never migrates a save into a different game revision implicitly.
-
-The native save dialog defaults to ElseWhen's application-data `saves` folder. Users may choose another path to export a named save.
-
-## Settings and credentials
-
-Settings and recent-project paths are application-data JSON. Encrypted credentials occupy a separate `credential.bin`; plaintext credentials are not serialized. Theme, panel sizes, map preference, and transcript font size are renderer-local preferences. Neither projects nor exported games receive them.
+Writes use temporary files, flush and rename. Project locks, external-change fingerprints, rolling backups and separate recovery snapshots protect authoring work. Source and saves never include credentials. On startup, only the retired application-owned credential.bin is removed without reading it; settings migration retains recent projects and unrelated preferences.

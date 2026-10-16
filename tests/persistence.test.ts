@@ -1,3 +1,4 @@
+import { actionSchema } from '../packages/domain/src/index';
 import { it, expect, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import { zipSync, strToU8, unzipSync } from 'fflate';
@@ -18,7 +19,13 @@ import { Session } from '../apps/desktop/src/main/session';
 it('deterministically compiles, strips notes, and roundtrips the archive', () => {
   const p = foldedHorizon();
   p.notes = 'secret note';
-  p.actions[0].privateExamples = ['secret test'];
+  p.actions.push(
+    actionSchema.parse({
+      id: 'test-action',
+      name: 'Test action',
+      privateExamples: ['secret test'],
+    }),
+  );
   const a = compile(p);
   expect(a.project.notes).toBe('');
   expect(a.project.actions[0].privateExamples).toEqual([]);
@@ -86,12 +93,40 @@ it('rejects incompatible saves and unsupported versions', () => {
   save.hash = 'changed';
   expect(() => readSave(save, s.game)).toThrow('SAVE_MISMATCH');
   expect(() => migrateProject({ ...foldedHorizon(), schemaVersion: 99 })).toThrow(
-    'supports schema 1',
+    'supports schema 2',
   );
+});
+it('rejects corrupted saved references without replacing the live session', async () => {
+  const s = new Session(compile(foldedHorizon()), true);
+  await s.command('take lantern');
+  const original = s.save();
+  const mutations: ((save: typeof original) => void)[] = [
+    (save) => {
+      save.state.consumed.push('missing');
+    },
+    (save) => {
+      save.state.objects.missing = structuredClone(Object.values(save.state.objects)[0]);
+    },
+    (save) => {
+      Object.values(save.state.observations)[0].id = 'missing';
+    },
+    (save) => {
+      save.discourse.repeat!.action.args.item = 'missing';
+    },
+    (save) => {
+      save.state.ending = 'missing';
+    },
+  ];
+  for (const mutate of mutations) {
+    const damaged = structuredClone(original);
+    mutate(damaged);
+    expect(() => s.restore(damaged)).toThrow();
+    expect(s.save()).toEqual(original);
+  }
 });
 it('migrates an older fixture without mutating its source', () => {
   const old = { ...foldedHorizon(), schemaVersion: 0 };
-  expect(migrateProject(old).schemaVersion).toBe(1);
+  expect(migrateProject(old).schemaVersion).toBe(2);
   expect(old.schemaVersion).toBe(0);
 });
 it('saves atomically, makes backups, and detects external changes', async () => {

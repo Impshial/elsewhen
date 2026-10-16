@@ -4,6 +4,7 @@ import {
   type TranscriptEntry,
   type ActionResult,
   type Scalar,
+  type CanonicalAction,
 } from '../../../../packages/domain/src/index';
 import { type CompiledGame } from '../../../../packages/compiler/src/index';
 import {
@@ -16,31 +17,45 @@ import {
 } from '../../../../packages/engine/src/index';
 import {
   buildContext,
-  conventional,
-  validateInterpretation,
-  toCanonical,
+  interpret,
   clarificationText,
   splitCommands,
+  isCommand,
+  emptyDiscourse,
   type Clarification,
-  type LanguageParser,
   type ParserContext,
+  type Resolution,
 } from '../../../../packages/parser/src/index';
+import { type Discourse } from '../../../../packages/domain/src/conversation';
 import { readSave, type SaveData } from '../../../../packages/persistence/src/index';
-type Checkpoint = { state: GameState; transcript: TranscriptEntry[]; referents: string[] };
+type Checkpoint = { state: GameState; transcript: TranscriptEntry[]; discourse: Discourse };
 export class Session {
   readonly id = crypto.randomUUID();
   epoch = 0;
   revision = 0;
   state: GameState;
   transcript: TranscriptEntry[];
-  referents: string[] = [];
+  discourse: Discourse = emptyDiscourse();
   pending: Clarification | null = null;
   remainder: string[] = [];
   last: ActionResult | null = null;
   context: ParserContext | null = null;
-  source = 'conventional';
+  source = 'local grammar';
   busy = false;
-  private abort: AbortController | null = null;
+  detached = false;
+  showCommandHints = true;
+  presentation = {
+    input: '',
+    history: [] as string[],
+    historyIndex: 0,
+    selected: '',
+    inventoryId: '',
+    fontSize: 19,
+    follow: true,
+    search: '',
+    scrollTop: 0,
+  };
+  interpretation: Resolution | null = null;
   private past: Checkpoint[] = [];
   private future: Checkpoint[] = [];
   constructor(
@@ -52,8 +67,7 @@ export class Session {
     this.transcript = initial.output.map((text) => ({ kind: 'narration', text }));
   }
   modified = false;
-  latency = 0;
-  usage: { input: number; output: number } | null = null;
+
   debugChange(change: {
     kind: 'teleport' | 'grant' | 'variable' | 'revealMap';
     ref: string;
@@ -68,6 +82,7 @@ export class Session {
       if (!p.locations.some((l) => l.id === change.ref)) throw new Error('Unknown location.');
       draft.previousLocation = draft.location;
       draft.location = change.ref;
+      draft.playerPlacement = { kind: 'location', id: change.ref };
     }
     if (change.kind === 'grant') {
       const o = p.objects.find((o) => o.id === change.ref);
@@ -112,20 +127,19 @@ export class Session {
     return this.view();
   }
   private checkpoint(): Checkpoint {
-    return clone({ state: this.state, transcript: this.transcript, referents: this.referents });
+    return clone({ state: this.state, transcript: this.transcript, discourse: this.discourse });
   }
   private restoreCheckpoint(c: Checkpoint) {
     this.state = c.state;
     this.transcript = c.transcript;
-    this.referents = c.referents;
+    this.discourse = c.discourse;
     this.last = null;
     this.context = null;
   }
   cancel() {
     this.epoch++;
     this.revision++;
-    this.abort?.abort();
-    this.abort = null;
+
     this.busy = false;
     this.pending = null;
     this.remainder = [];
@@ -151,21 +165,25 @@ export class Session {
   save(): SaveData {
     return {
       format: 'elsesave',
-      schemaVersion: 1,
+      schemaVersion: 2,
       gameId: this.game.project.id,
       hash: this.game.hash,
       ...this.checkpoint(),
+      pending: clone(this.pending),
+      remainder: [...this.remainder],
     };
   }
   restore(raw: unknown) {
     const save = readSave(raw, this.game);
     this.cancel();
     this.restoreCheckpoint(save);
+    this.pending = save.pending;
+    this.remainder = save.remainder;
     this.past = [];
     this.future = [];
     return this.view();
   }
-  view() {
+  view(includeDebug = this.debug) {
     return {
       id: this.id,
       revision: this.revision,
@@ -177,121 +195,203 @@ export class Session {
       canRedo: this.future.length > 0,
       busy: this.busy,
       source: this.source,
-      debug: this.debug,
+      debug: includeDebug && this.debug,
+      detached: this.detached,
+      showCommandHints: this.showCommandHints,
+      presentation: clone(this.presentation),
       modified: this.modified,
-      latency: this.latency,
-      usage: this.usage,
-      snapshot: this.debug ? this.game.project : null,
+      interpretation: includeDebug && this.debug ? this.interpretation : null,
+      snapshot: includeDebug && this.debug ? this.game.project : null,
       hash: this.game.hash,
-      last: this.debug ? this.last : null,
-      context: this.debug ? this.context : null,
+      last: includeDebug && this.debug ? this.last : null,
+      context: includeDebug && this.debug ? this.context : null,
     };
   }
-  travel(exitId: string) {
-    if (this.busy) throw new Error('A command is already being interpreted.');
-    const exit = projectPlayer(this.game.project, this.state).exits.find((e) => e.id === exitId);
-    if (!exit) throw new Error('Choose a visible exit from your current location.');
-    this.cancel();
+  private commit(
+    action: CanonicalAction,
+    input: string,
+    repeatable: boolean,
+    selector?: string,
+    group: string[] = [],
+  ) {
     const checkpoint = this.checkpoint(),
-      result = execute(this.game.project, this.state, { actionId: 'go', args: { exit: exitId } });
+      result = execute(this.game.project, this.state, action);
     this.last = result;
-    this.source = 'map';
     if (!result.committed) {
-      this.transcript.push({ kind: 'status', text: result.error ?? 'Travel failed.' });
-      return this.view();
+      this.transcript.push({
+        kind: 'status',
+        text: result.error ?? 'The action could not be completed.',
+      });
+      return result;
     }
     this.past.push(checkpoint);
     if (this.past.length > 100) this.past.shift();
     this.future = [];
     this.state = result.state;
     this.transcript.push(
-      { kind: 'command', text: `go ${exit.name}` },
+      { kind: 'command', text: input },
       ...result.output.map((text) => ({ kind: 'narration' as const, text })),
     );
-    this.referents = [...this.referents, exitId].slice(-6);
+    if (result.success) {
+      const main = String(
+        action.args.target ??
+          action.args.destination ??
+          action.args.item ??
+          action.args.recipient ??
+          '',
+      );
+      if (this.game.project.objects.some((o) => o.id === main)) this.discourse.object = main;
+      if (this.game.project.characters.some((c) => c.id === main)) this.discourse.character = main;
+      const recipient = String(action.args.recipient ?? '');
+      if (this.game.project.characters.some((c) => c.id === recipient)) {
+        this.discourse.character = recipient;
+        this.discourse.recipient = recipient;
+      }
+      if (typeof action.args.topic === 'string') this.discourse.topic = action.args.topic;
+    }
+    this.discourse.repeat = repeatable
+      ? { action: clone(action), ...(selector ? { selector } : {}) }
+      : null;
+    if (group.length) this.discourse.plural = [...group];
+    return result;
+  }
+  travel(exitId: string) {
+    if (this.busy) throw new Error('A command is already running.');
+    const exit = projectPlayer(this.game.project, this.state).exits.find((e) => e.id === exitId);
+    if (!exit) throw new Error('Choose a visible exit from your current location.');
+    this.cancel();
+    this.source = 'map';
+    this.commit(
+      { actionId: 'go', args: { exit: exitId } },
+      'go ' + exit.name,
+      true,
+      exit.direction || exit.name,
+    );
     return this.view();
   }
-  async command(input: string, parser?: LanguageParser) {
-    if (this.busy) throw new Error('A command is already being interpreted.');
-    const queue = splitCommands(input);
-    const epoch = this.epoch;
-    const revision = ++this.revision;
-    this.busy = true;
-    const abort = new AbortController();
-    this.abort = abort;
+  async command(input: string) {
+    if (this.busy) throw new Error('A command is already running.');
+    const system = input.trim().toLowerCase();
+    if (system === 'cancel') {
+      this.cancel();
+      return this.view();
+    }
+    if (system === 'undo') return this.undo();
+    if (system === 'redo') return this.redo();
+    if (system === 'help' || system === 'commands') {
+      this.transcript.push({
+        kind: 'status',
+        text: 'Use names and aliases: LOOK, EXAMINE key, TAKE key, OPEN drawer, UNLOCK drawer WITH key, PUT photograph IN case, PUT book ON desk, ASK caretaker ABOUT photograph, SAY "hello" TO caretaker, GO NORTH. Separate commands with THEN or a semicolon. Lists and ALL are supported. SAVE, RESTORE, UNDO, REDO, RESTART, AGAIN and CANCEL are system commands.',
+      });
+      return this.view();
+    }
+    let ctx = buildContext(
+      projectPlayer(this.game.project, this.state),
+      this.discourse,
+      this.pending,
+    );
+    let queue: string[];
     try {
-      for (let i = 0; i < queue.length; i++) {
-        const command = queue[i];
-        this.context = buildContext(
-          projectPlayer(this.game.project, this.state),
-          this.referents,
-          this.transcript.map((e) => e.text),
-          this.pending,
-        );
-        let envelope = conventional(command, this.context);
-        this.source = 'conventional';
-        if (envelope.result.kind === 'unsupported' && parser) {
-          this.source = 'OpenAI';
-          const started = Date.now();
-          envelope = await parser.parse(command, this.context, abort.signal);
-          this.latency = Date.now() - started;
-          this.usage = parser.usage ?? null;
-        }
-        if (this.epoch !== epoch || this.revision !== revision || abort.signal.aborted)
-          return this.view();
-        envelope = validateInterpretation(envelope, this.context);
-        const r = envelope.result;
-        if (r.kind === 'unsupported') {
-          this.transcript.push({
-            kind: 'status',
-            text: 'I could not interpret that. Try a conventional command, such as “examine case”, or enable OpenAI parsing in Settings.',
-          });
-          this.remainder = queue.slice(i + 1);
-          break;
-        }
-        if (r.kind === 'clarify') {
-          this.pending = r;
-          this.transcript.push({ kind: 'status', text: clarificationText(r, this.context) });
-          this.remainder = queue.slice(i + 1);
-          break;
-        }
-        const checkpoint = this.checkpoint(),
-          result = execute(this.game.project, this.state, toCanonical(r));
-        this.last = result;
-        if (!result.committed) {
-          this.transcript.push({
-            kind: 'status',
-            text: result.error ?? 'The command could not be executed.',
-          });
-          this.remainder = queue.slice(i + 1);
-          break;
-        }
-        this.past.push(checkpoint);
-        if (this.past.length > 100) this.past.shift();
-        this.future = [];
-        this.state = result.state;
+      queue = splitCommands(input, ctx);
+    } catch (error) {
+      this.transcript.push({ kind: 'status', text: (error as Error).message });
+      return this.view();
+    }
+    if (!queue.length) return this.view();
+    let initial: Resolution | undefined;
+    if (system === 'again' || system === 'g') {
+      const repeat = clone(this.discourse.repeat);
+      this.cancel();
+      if (!repeat) {
+        this.transcript.push({
+          kind: 'status',
+          text: 'There is no single action to repeat. Sequences and bulk commands are not repeatable.',
+        });
+        return this.view();
+      }
+      if (repeat.selector) queue = ['go ' + repeat.selector];
+      else {
+        this.commit(repeat.action, 'again', true);
+        return this.view();
+      }
+    }
+    if (this.pending) {
+      if (isCommand(input, ctx)) {
         this.pending = null;
-        this.transcript.push(
-          { kind: 'command', text: command },
-          ...result.output.map((text) => ({ kind: 'narration' as const, text })),
-        );
-        this.referents = [
-          ...this.referents,
-          ...r.arguments.flatMap((a) => ('id' in a.value ? [a.value.id] : [])),
-        ].slice(-6);
-        if (!result.success || this.state.ending) {
-          this.remainder = queue.slice(i + 1);
-          break;
+        this.remainder = [];
+      } else {
+        initial = interpret(input, ctx);
+        if (initial.kind === 'diagnostic') {
+          this.transcript.push({ kind: 'status', text: initial.message });
+          return this.view();
         }
+        if (initial.kind !== 'resolved') {
+          this.pending = initial;
+          this.transcript.push({ kind: 'status', text: clarificationText(initial) });
+          return this.view();
+        }
+        queue = [initial.command.input, ...this.remainder];
+        this.pending = null;
         this.remainder = [];
       }
-    } finally {
-      if (this.epoch === epoch && this.revision === revision) {
-        this.busy = false;
-        this.abort = null;
+    }
+    const epoch = this.epoch;
+    this.revision++;
+    this.busy = true;
+    this.source = 'local grammar';
+    const sequence = queue.length > 1;
+    try {
+      for (let i = 0; i < queue.length; i++) {
+        if (epoch !== this.epoch) break;
+        ctx = buildContext(
+          projectPlayer(this.game.project, this.state),
+          this.discourse,
+          this.pending,
+        );
+        this.context = ctx;
+        let result: Resolution;
+        try {
+          result = i === 0 && initial ? initial : interpret(queue[i], ctx);
+        } catch (error) {
+          result = { kind: 'diagnostic', message: (error as Error).message };
+        }
+        this.interpretation = result;
+        if (result.kind === 'diagnostic') {
+          this.transcript.push({ kind: 'status', text: result.message });
+          this.remainder = [];
+          break;
+        }
+        if (result.kind !== 'resolved') {
+          if (sequence) result.command.multiple = true;
+          this.pending = result;
+          this.remainder = queue.slice(i + 1);
+          this.transcript.push({ kind: 'status', text: clarificationText(result) });
+          break;
+        }
+        this.pending = null;
+        let refused = false;
+        const bulk = result.actions.length > 1 || result.command.multiple;
+        if (sequence || bulk) this.discourse.repeat = null;
+        for (const action of result.actions) {
+          if (epoch !== this.epoch || this.state.ending) break;
+          const committed = this.commit(
+            action,
+            queue[i],
+            !sequence && !bulk,
+            result.command.selector,
+            result.group,
+          );
+          if (!committed.success) refused = true;
+          if (!committed.committed) break;
+        }
+        this.remainder = [];
+        if (refused || this.state.ending) break;
       }
+    } finally {
+      this.busy = false;
     }
     return this.view();
   }
 }
+
 export type SessionView = ReturnType<Session['view']>;

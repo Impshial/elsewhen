@@ -1,3 +1,4 @@
+import { VocabularyEditor } from './VocabularyEditor';
 import { TestsEditor } from './TestsEditor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -35,12 +36,13 @@ const labels: Record<Collection, string> = {
   objects: 'Objects',
   characters: 'Characters',
   connections: 'Connections',
-  actions: 'Actions',
+  actions: 'Custom Actions',
   rules: 'Rules & events',
   variables: 'Variables',
   templates: 'Reusable types',
 };
 export function App() {
+  useEffect(() => window.elsewhen.onSession((s) => useEditor.getState().setSession(s)), []);
   const [showDesigner, setShowDesigner] = useState(false),
     [mapRegion, setMapRegion] = useState(''),
     [playtestSource, setPlaytestSource] = useState(''),
@@ -472,9 +474,12 @@ export function App() {
         <main className="designer-layout">
           <aside className="project-explorer">
             <header>
-              <span>PROJECT</span>
+              <span>WORLD EXPLORER</span>
               <Button icon="plus" title="Add entity" onClick={() => add('locations')} />
             </header>
+            <Button icon="book" onClick={() => setModal('vocabulary')}>
+              Vocabulary
+            </Button>
             <div className="explorer-search">
               <Icon name="search" size={15} />
               <input
@@ -771,10 +776,10 @@ export function App() {
         <div className="toolbar-spacer" />
         <button onClick={() => setModal('settings')}>
           <i className="status-dot" />
-          {boot.settings.enabled ? 'OpenAI parser enabled' : 'Conventional parser'}
+          Local English parser
           <Icon name="down" size={13} />
         </button>
-        <span className="version">v0.1.0</span>
+        <span className="version">v0.2.0</span>
       </footer>
       {editor.toast && (
         <div className="toast" role="status">
@@ -790,6 +795,16 @@ export function App() {
           onClose={() => setModal('')}
           onKind={setAddKind}
         />
+      )}
+      {modal === 'vocabulary' && (
+        <Modal title="Vocabulary & standard actions" onClose={() => setModal('')}>
+          <VocabularyEditor
+            onOpen={(id) => {
+              useEditor.getState().open(id);
+              setModal('');
+            }}
+          />
+        </Modal>
       )}
       {modal === 'settings' && (
         <SettingsDialog
@@ -1430,7 +1445,7 @@ function AddDialog({
     onClose();
   };
   return (
-    <Modal title="Add to your world" onClose={onClose}>
+    <Modal title="Add Entity" onClose={onClose}>
       <form
         className="modal-body"
         onSubmit={(e) => {
@@ -1498,147 +1513,45 @@ function SettingsDialog({
   onClose: () => void;
   onSaved: (s: Settings) => void;
 }) {
-  const [settings, setSettings] = useState<Settings | null>(null),
-    [remember, setRemember] = useState(true),
-    [status, setStatus] = useState(''),
-    [working, setWorking] = useState(false),
-    key = useRef<HTMLInputElement>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   useEffect(() => {
-    host('settings', null).then(setSettings);
+    void host('settings', null).then(setSettings);
   }, []);
-  const save = async () => {
-    if (!settings) return;
-    setWorking(true);
-    try {
-      const next = await host('updateSettings', {
-        model: settings.model,
-        enabled: settings.enabled,
-        timeout: settings.timeout,
-        key: key.current?.value || undefined,
-        remember,
-      });
-      if (key.current) key.current.value = '';
-      setSettings(next);
-      onSaved(next);
-      setStatus('Settings saved.');
-    } catch (e) {
-      setStatus((e as Error).message);
-    } finally {
-      setWorking(false);
-    }
-  };
   return (
-    <Modal title="Preferences & parser" onClose={onClose}>
+    <Modal title="Preferences & commands" onClose={onClose}>
       <div className="modal-body">
+        <h3>Your words. Your world.</h3>
+        <p>
+          ElseWhen understands traditional English adventure commands entirely on your computer.
+        </p>
+        <p>
+          Try “take key”, “unlock drawer with key”, “put photo in case”, “ask caretaker about the
+          gate”, or “north”. Use THEN or a semicolon to queue commands. Type HELP during play for
+          more examples.
+        </p>
         {settings && (
-          <>
-            <div className="settings-intro">
-              <span className="brand-mark">
-                <Icon name="feather" />
-              </span>
-              <div>
-                <h3>Your words. Your world.</h3>
-                <p>
-                  Conventional commands always work offline. Enable OpenAI to interpret natural
-                  phrasing.
-                </p>
-              </div>
-            </div>
-            <Toggle
-              label="Enable OpenAI interpretation"
-              checked={settings.enabled}
-              onChange={(enabled) => setSettings({ ...settings, enabled })}
-            />
-            <Field
-              label="OpenAI API key"
-              hint={
-                settings.hasKey
-                  ? `A key is configured · ${settings.storage === 'protected' ? 'OS-protected storage available' : 'Session-only storage'}`
-                  : 'Keys are kept by the desktop host and are never included in projects or exported games.'
-              }
-            >
-              <input
-                ref={key}
-                type="password"
-                autoComplete="off"
-                placeholder={settings.hasKey ? 'Enter a replacement key' : 'sk-…'}
-              />
-            </Field>
-            <Toggle
-              label="Remember key with OS protection"
-              checked={remember}
-              onChange={setRemember}
-              hint={
-                settings.storage === 'session'
-                  ? 'Protected storage is unavailable. Credentials will last for this session only.'
-                  : undefined
-              }
-            />
-            <div className="form-grid">
-              <TextField
-                label="Model ID"
-                value={settings.model}
-                onChange={(model) => setSettings({ ...settings, model })}
-              />
-              <TextField
-                label="Timeout (seconds)"
-                type="number"
-                value={settings.timeout}
-                onChange={(v) => setSettings({ ...settings, timeout: Number(v) })}
-              />
-            </div>
-            <p className="privacy-note">
-              <Icon name="lock" size={16} />
-              When enabled, unrecognized commands and relevant player-visible context are sent to
-              OpenAI. Hidden world data and private author notes are excluded. API usage is billed
-              by your provider.
-            </p>
-            <div className="row">
-              <Button
-                icon="play"
-                disabled={working}
-                onClick={() => {
-                  setWorking(true);
-                  host('testConnection', null)
-                    .then(setStatus)
-                    .catch((e) => setStatus(e.message))
-                    .finally(() => setWorking(false));
-                }}
-              >
-                Test saved connection
-              </Button>
-              <Button
-                variant="ghost danger"
-                disabled={!settings.hasKey}
-                onClick={() =>
-                  void host('updateSettings', {
-                    model: settings.model,
-                    enabled: false,
-                    timeout: settings.timeout,
-                    removeKey: true,
-                  }).then((s) => {
-                    setSettings(s);
-                    onSaved(s);
-                    setStatus('Key removed.');
-                  })
-                }
-              >
-                Remove key
-              </Button>
-            </div>
-            {status && (
-              <p className="settings-result" role="status">
-                {status}
-              </p>
-            )}
-            <div className="modal-footer">
-              <Button onClick={onClose}>Close</Button>
-              <Button variant="primary" icon="save" disabled={working} onClick={() => void save()}>
-                Save preferences
-              </Button>
-            </div>
-          </>
+          <Toggle
+            label="Show command hints"
+            checked={settings.showCommandHints}
+            onChange={(showCommandHints) => setSettings({ ...settings, showCommandHints })}
+          />
         )}
+        <div className="modal-footer">
+          <Button onClick={onClose}>Close</Button>
+          <Button
+            variant="primary"
+            disabled={!settings}
+            onClick={() => {
+              if (settings)
+                void host('updateSettings', settings).then((s) => {
+                  onSaved(s);
+                  onClose();
+                });
+            }}
+          >
+            Save preferences
+          </Button>
+        </div>
       </div>
     </Modal>
   );

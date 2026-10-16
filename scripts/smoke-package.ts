@@ -9,12 +9,17 @@ const data = await mkdtemp(path.join(tmpdir(), 'elsewhen-packaged-')),
 await writeFile(game, exportGame(foldedHorizon()));
 const application = await electron.launch({
   executablePath: path.resolve('release/win-unpacked/ElseWhen.exe'),
-  args: [game],
-  env: { ...process.env, ELSEWHEN_TEST_DATA: data },
+  args: [game, '--proxy-server=http://127.0.0.1:9', '--host-resolver-rules=MAP * ~NOTFOUND'],
+  env: { ...process.env, OPENAI_API_KEY: '', ELSEWHEN_TEST_DATA: data },
 });
 try {
   const page = await application.firstWindow(),
     errors: string[] = [];
+  const requests: string[] = [];
+  await application.context().route(/^https?:/, (route) => {
+    requests.push(route.request().url());
+    return route.abort();
+  });
   page.on('pageerror', (error) => errors.push(error.message));
   await expect(page.getByRole('heading', { name: 'Nexus', exact: true })).toBeVisible();
   for (const command of walkthrough) {
@@ -26,6 +31,7 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/packaged-player.png' });
   expect(errors).toEqual([]);
+  expect(requests).toEqual([]);
   console.log(
     await application.evaluate(({ app }) => {
       return {

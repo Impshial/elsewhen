@@ -41,7 +41,7 @@ export function validateProject(input: unknown): Issue[] {
       entityId: '',
       field: i.path.join('.'),
     }));
-  const p = parsed.data,
+  const p = resolveTemplates(parsed.data),
     issues: Issue[] = [];
   const add = (
     code: string,
@@ -53,6 +53,7 @@ export function validateProject(input: unknown): Issue[] {
   const all = collections.flatMap((c) => p[c] as { id: string; name: string }[]),
     ids = new Set<string>();
   all.push(...p.characters.flatMap((c) => c.topics));
+  all.push(...p.events, ...p.endings);
   for (const e of all) {
     if (ids.has(e.id)) add('DUPLICATE_ID', 'Stable IDs must be unique.', e.id);
     ids.add(e.id);
@@ -136,6 +137,34 @@ export function validateProject(input: unknown): Issue[] {
     if (o.template) ref(o.template, o.id, 'template', new Set(p.templates.map((t) => t.id)));
   }
   for (const c of p.characters) ref(c.location, c.id, 'location', locations);
+  const placements = new Map([
+    ...p.objects.map((o) => [o.id, o.placement] as const),
+    ...p.characters.map(
+      (c) => [c.id, c.placement ?? { kind: 'location' as const, id: c.location }] as const,
+    ),
+  ]);
+  for (const [id, placement] of placements) {
+    const seen = new Set([id]);
+    let current = placement;
+    while (['inside', 'on', 'character'].includes(current.kind)) {
+      if (seen.has(current.id)) {
+        add(
+          'ACTOR_CONTAINMENT_CYCLE',
+          'Objects and characters cannot contain or possess their own enclosing entity.',
+          id,
+          'placement',
+        );
+        break;
+      }
+      seen.add(current.id);
+      const parent = placements.get(current.id);
+      if (!parent) {
+        add('PLACEMENT_PARENT', 'Choose an existing parent for this placement.', id, 'placement');
+        break;
+      }
+      current = parent;
+    }
+  }
   for (const v of p.variables)
     if (!valueValid(v, v.initial, p))
       add('VALUE_TYPE', `The initial value does not match ${v.name}'s type.`, v.id, 'initial');
@@ -151,7 +180,8 @@ export function validateProject(input: unknown): Issue[] {
     } else if (c.kind === 'test') ref(c.ref, owner, 'condition');
     else if (c.source === 'variable')
       ref(c.ref, owner, 'condition', new Set(p.variables.map((v) => v.id)));
-    else if (c.source === 'property') ref(c.ref, owner, 'condition', objects);
+    else if (c.source === 'property')
+      ref(c.ref, owner, 'condition', new Set([...p.objects, ...p.characters].map((e) => e.id)));
   };
   const checkEffects = (es: Effect[], owner: string, depth = 0) => {
     if (depth > 8) {
@@ -185,10 +215,25 @@ export function validateProject(input: unknown): Issue[] {
     });
   };
   for (const r of p.rules) {
+    if (r.phase === 'check' && r.effects.length)
+      add(
+        'CHECK_EFFECTS',
+        'Requirements are pure. Move consequences to Instead or After.',
+        r.id,
+        'effects',
+      );
+    checkCondition(r.appliesWhen, r.id);
     if (r.phase !== 'event' && !actions.has(r.trigger))
       add('ACTION', 'Choose a valid action trigger.', r.id, 'trigger');
     if (r.scope) ref(r.scope, r.id, 'scope');
     Object.entries(r.bindings).forEach(([key, val]) => {
+      if (r.phase !== 'event' && !actions.get(r.trigger)?.parameters.some((p) => p.id === key))
+        add(
+          'BINDING_ROLE',
+          'This binding no longer belongs to the selected action. Choose the role again.',
+          r.id,
+          'bindings',
+        );
       if (
         actions.get(r.trigger)?.parameters.find((p) => p.id === key)?.kind === 'entity' &&
         typeof val === 'string'
@@ -198,6 +243,59 @@ export function validateProject(input: unknown): Issue[] {
     checkCondition(r.condition, r.id);
     checkEffects(r.effects, r.id);
   }
+  const productions = new Map<string, string>();
+  for (const a of actions.values())
+    for (const form of a.forms) {
+      if (
+        form.parts[0]?.kind === 'literal' &&
+        [
+          'help',
+          'commands',
+          'save',
+          'restore',
+          'load',
+          'undo',
+          'redo',
+          'restart',
+          'again',
+          'g',
+          'cancel',
+        ].includes(form.parts[0].text.trim().toLowerCase().split(/\s+/)[0])
+      )
+        add(
+          'RESERVED_COMMAND',
+          `“${form.parts[0].text}” begins with a reserved session command. Choose another verb phrase.`,
+          a.id,
+          'forms',
+        );
+      for (const part of form.parts)
+        if (part.kind === 'role' && !a.parameters.some((p) => p.id === part.role))
+          add(
+            'GRAMMAR_ROLE',
+            `A command form for ${a.name} refers to a removed role.`,
+            a.id,
+            'forms',
+          );
+      const pattern = form.parts
+        .map((part) =>
+          part.kind === 'literal'
+            ? part.text.toLowerCase().trim()
+            : '<' + (a.parameters.find((p) => p.id === part.role)?.kind ?? 'role') + '>',
+        )
+        .join(' ');
+      const other = productions.get(pattern);
+      if (other && other !== a.id)
+        add(
+          'GRAMMAR_CONFLICT',
+          `The form “${pattern}” is shared by ${a.name} and ${actions.get(other)?.name}. Players may need to clarify.`,
+          a.id,
+          'forms',
+          'warning',
+        );
+      productions.set(pattern, a.id);
+    }
+  for (const item of p.migration)
+    if (item.blocking) add('MIGRATION_REVIEW', item.message, item.entityId, 'migration');
   for (const c of p.connections) {
     checkCondition(c.visibleWhen, c.id);
     checkCondition(c.traverseWhen, c.id);
@@ -259,12 +357,19 @@ export function resolveTemplates(input: Project): Project {
       chain.unshift(t);
       t = p.templates.find((x) => x.id === t!.parent);
     }
-    const defaults: Record<string, import('../../domain/src/index').Scalar> = {};
+    const defaults: Record<string, import('../../domain/src/index').Scalar> = Object.fromEntries(
+      p.propertyDefinitions.map((v) => [v.id, v.initial]),
+    );
     for (const template of chain) {
       o.capabilities = Array.from(new Set([...template.capabilities, ...o.capabilities]));
       for (const prop of template.properties) defaults[prop.id] = prop.initial;
     }
     o.properties = { ...defaults, ...o.properties };
   }
+  for (const c of p.characters)
+    c.properties = {
+      ...Object.fromEntries(p.propertyDefinitions.map((v) => [v.id, v.initial])),
+      ...c.properties,
+    };
   return p;
 }

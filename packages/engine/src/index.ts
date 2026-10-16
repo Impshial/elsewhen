@@ -53,60 +53,92 @@ const remember = (s: GameState, id: string) => {
 export function ancestry(s: GameState, id: string): Placement[] {
   const chain: Placement[] = [],
     seen = new Set([id]);
-  let pl = s.placements[id];
+  let pl = id === 'player' ? s.playerPlacement : s.placements[id];
   while (pl) {
     chain.push(pl);
-    if (!['inside', 'on'].includes(pl.kind)) break;
-    if (seen.has(pl.id)) throw new Error('Containment cycle.');
-    seen.add(pl.id);
-    pl = s.placements[pl.id];
+    if (!['inside', 'on', 'character', 'player'].includes(pl.kind)) break;
+    const parent = pl.kind === 'player' ? 'player' : pl.id;
+    if (seen.has(parent)) throw new Error('Containment cycle.');
+    seen.add(parent);
+    pl = parent === 'player' ? s.playerPlacement : s.placements[parent];
   }
   return chain;
 }
 export const carried = (s: GameState, id: string) =>
-  ancestry(s, id).some((p) => p.kind === 'player');
+  ancestry(s, id).some((pl) => pl.kind === 'player');
+export function effectiveRoom(s: GameState, id = 'player'): string {
+  const root = ancestry(s, id).at(-1);
+  return root?.kind === 'location' ? root.id : '';
+}
+function synchronizeActors(s: GameState) {
+  s.location = effectiveRoom(s);
+  for (const id of Object.keys(s.characters)) s.characters[id] = effectiveRoom(s, id);
+}
 function physical(
   p: Project,
   s: GameState,
   id: string,
+  light = false,
 ): { near: boolean; visible: boolean; reachable: boolean } {
-  const o = index(p).objects.get(id);
-  if (!o) {
-    const c = index(p).characters.get(id);
-    const near = !!c && s.characters[id] === s.location;
-    return { near, visible: near, reachable: near };
-  }
+  const o = index(p).objects.get(id),
+    character = index(p).characters.get(id);
+  if (!o && !character) return { near: false, visible: false, reachable: false };
   const chain = ancestry(s, id),
-    root = chain.at(-1);
+    root = chain.at(-1),
+    viewer = ancestry(s, 'player');
   const door =
     root?.kind === 'connection' &&
     p.connections.some((c) => c.doorId === id && (c.from === s.location || c.to === s.location));
-  const near = !!(
-    door ||
-    root?.kind === 'player' ||
-    (root?.kind === 'location' && root.id === s.location)
-  );
-  let visible = near && !s.objects[id].concealed,
-    reachable = near && !s.objects[id].concealed;
-  for (const pl of chain)
-    if (pl.kind === 'inside') {
-      const parent = index(p).objects.get(pl.id)!;
-      if (parent.capabilities.includes('openable') && !s.objects[pl.id].open) {
-        reachable = false;
-        if (!parent.transparent) visible = false;
-      }
-      if (s.objects[pl.id].concealed) {
-        visible = false;
-        reachable = false;
-      }
+  const near = !!door || (root?.kind === 'location' && root.id === s.location);
+  let visible = near && (light || !s.objects[id]?.concealed),
+    reachable = near && !s.objects[id]?.concealed;
+  const interiors = (xs: Placement[]) =>
+    new Set(xs.filter((pl) => pl.kind === 'inside').map((pl) => pl.id));
+  const targetInside = interiors(chain),
+    viewerInside = interiors(viewer);
+  for (const parentId of new Set([...targetInside, ...viewerInside])) {
+    if (parentId === id) continue;
+    if (targetInside.has(parentId) === viewerInside.has(parentId)) continue;
+    const parent = index(p).objects.get(parentId);
+    if (parent?.capabilities.includes('openable') && !s.objects[parentId].open) {
+      reachable = false;
+      if (!parent.transparent) visible = false;
     }
+    if (!light && s.objects[parentId]?.concealed) {
+      visible = false;
+      reachable = false;
+    }
+  }
+  const owner = chain.find((pl) => pl.kind === 'character');
+  if (owner) {
+    const npc = index(p).characters.get(owner.id);
+    if (!npc?.possessionsVisible) {
+      visible = false;
+      reachable = false;
+    }
+  }
   return { near, visible, reachable };
 }
 export function illuminated(p: Project, s: GameState): boolean {
-  if (!index(p).locations.get(s.location)?.dark) return true;
-  return p.objects.some(
-    (o) =>
-      o.capabilities.includes('light') && s.objects[o.id].active && physical(p, s, o.id).visible,
+  const ambient =
+    !index(p).locations.get(s.location)?.dark &&
+    !ancestry(s, 'player').some((pl) => {
+      const o = index(p).objects.get(pl.id);
+      return (
+        pl.kind === 'inside' &&
+        o?.capabilities.includes('openable') &&
+        !s.objects[pl.id].open &&
+        !o.transparent
+      );
+    });
+  return (
+    ambient ||
+    p.objects.some(
+      (o) =>
+        o.capabilities.includes('light') &&
+        s.objects[o.id].active &&
+        physical(p, s, o.id, true).visible,
+    )
   );
 }
 export function scope(
@@ -125,7 +157,8 @@ export function scope(
     (!o || evaluate(p, s, o.visibleWhen, {}, depth + 1));
   return {
     visible,
-    reachable: base.reachable && (visible || isCarried),
+    reachable:
+      base.reachable && (visible || isCarried || ancestry(s, 'player').some((pl) => pl.id === id)),
     carried: isCarried,
     accessible: isCarried && base.reachable,
   };
@@ -159,7 +192,7 @@ export function evaluate(
     c.source === 'variable'
       ? s.variables[ref]
       : c.source === 'property'
-        ? s.objects[ref]?.properties[c.key]
+        ? (s.objects[ref]?.properties ?? s.characterProperties[ref])?.[c.key]
         : c.source === 'argument'
           ? b[c.key]
           : c.source === 'turn'
@@ -244,12 +277,35 @@ function observe(p: Project, s: GameState, id: string, description?: string): vo
   remember(s, id);
   s.observations[id] = {
     id,
+    nouns: clone(e.nouns),
+    adjectives: clone(e.adjectives),
+    plurals: clone(e.plurals),
+    ...('pronouns' in e ? { pronouns: clone(e.pronouns) } : {}),
+    ...('direction' in e
+      ? { direction: e.direction, doorId: e.doorId, destination: known(s, e.to) ? e.to : undefined }
+      : {}),
     name: e.name,
     aliases: clone(e.aliases),
     kind,
     description: description ?? s.observations[id]?.description ?? '',
     capabilities: 'capabilities' in e ? [...e.capabilities] : [],
   };
+}
+function describeScene(p: Project, s: GameState): string {
+  const present = [
+    ...p.objects.filter(
+      (o) =>
+        !o.capabilities.includes('scenery') &&
+        !carried(s, o.id) &&
+        scope(p, s, o.id).visible &&
+        ['location', 'connection'].includes(s.placements[o.id]?.kind),
+    ),
+    ...p.characters.filter((c) => scope(p, s, c.id).visible),
+  ].map((e) => e.name);
+  return (
+    describe(p, s, s.location) +
+    (present.length ? '\n\nYou can see ' + present.join(', ') + '.' : '')
+  );
 }
 export function refreshKnowledge(p: Project, s: GameState): void {
   observe(p, s, s.location, describe(p, s, s.location));
@@ -272,9 +328,40 @@ export function refreshKnowledge(p: Project, s: GameState): void {
         if ((t.known && !s.forgottenTopics.includes(t.id)) || known(s, t.id)) observe(p, s, t.id);
 }
 export function projectPlayer(p: Project, s: GameState): PlayerView {
+  const observation = (id: string): Observation => {
+    const seen = s.observations[id],
+      info = scope(p, s, id),
+      pl = s.placements[id];
+    if (!info.visible && !info.carried)
+      return {
+        ...seen,
+        facts: {
+          ...info,
+          directlyHeld: false,
+          worn: false,
+          npcOwned: false,
+          allowsTaking: false,
+          parent: '',
+          relation: '',
+        },
+      };
+    const owner = ancestry(s, id).find((x) => x.kind === 'character');
+    return {
+      ...seen,
+      facts: {
+        ...info,
+        directlyHeld: pl?.kind === 'player',
+        worn: !!s.objects[id]?.worn,
+        npcOwned: !!owner,
+        allowsTaking: !!owner && !!index(p).characters.get(owner.id)?.allowsTaking,
+        parent: pl?.id ?? '',
+        relation: pl?.kind ?? '',
+      },
+    };
+  };
   const entities = [...p.objects, ...p.characters]
     .filter((e) => scope(p, s, e.id).visible)
-    .map((e) => s.observations[e.id])
+    .map((e) => observation(e.id))
     .filter(Boolean);
   const exits = p.connections
     .filter(
@@ -285,7 +372,12 @@ export function projectPlayer(p: Project, s: GameState): PlayerView {
         (illuminated(p, s) || c.inDark) &&
         evaluate(p, s, c.visibleWhen),
     )
-    .map((c) => s.observations[c.id]);
+    .map((c) => ({
+      ...s.observations[c.id],
+      direction: c.direction,
+      doorId: c.doorId,
+      destination: known(s, c.to) ? c.to : undefined,
+    }));
   const knownLocations = p.locations.filter((l) => known(s, l.id));
   const nodes: PlayerView['nodes'] = knownLocations.map((l) => ({
     id: l.id,
@@ -323,14 +415,19 @@ export function projectPlayer(p: Project, s: GameState): PlayerView {
     }
   return {
     title: p.title,
+    occupancy: ['inside', 'on'].includes(s.playerPlacement.kind)
+      ? { id: s.playerPlacement.id, relation: s.playerPlacement.kind }
+      : undefined,
     location: s.observations[s.location],
     turn: s.turn,
     ending: s.ending,
     entities,
     inventory: p.objects
       .filter((o) => carried(s, o.id) && known(s, o.id))
-      .map((o) => s.observations[o.id]),
-    known: Object.values(s.observations),
+      .map((o) => observation(o.id)),
+    known: Object.values(s.observations).map((e) =>
+      e.kind === 'object' || e.kind === 'character' ? observation(e.id) : e,
+    ),
     exits,
     topics: p.characters
       .filter((c) => s.characters[c.id] === s.location)
@@ -343,10 +440,25 @@ export function projectPlayer(p: Project, s: GameState): PlayerView {
   };
 }
 export function assertState(p: Project, s: GameState): void {
+  ancestry(s, 'player');
+  if (effectiveRoom(s) !== s.location)
+    throw new Error('Player placement and effective room disagree.');
   if (!p.locations.some((l) => l.id === s.location)) throw new Error('Player location is invalid.');
   const counts = new Map<string, number>();
   for (const pl of Object.values(s.placements))
     if (pl.kind === 'inside' || pl.kind === 'on') counts.set(pl.id, (counts.get(pl.id) ?? 0) + 1);
+  if (['inside', 'on'].includes(s.playerPlacement.kind))
+    counts.set(s.playerPlacement.id, (counts.get(s.playerPlacement.id) ?? 0) + 1);
+  for (const pl of [s.playerPlacement, ...p.characters.map((c) => s.placements[c.id])]) {
+    if (!pl) throw new Error('Missing actor placement.');
+    if (
+      ['inside', 'on'].includes(pl.kind) &&
+      !index(p)
+        .objects.get(pl.id)
+        ?.capabilities.includes(pl.kind === 'inside' ? 'container' : 'supporter')
+    )
+      throw new Error('Invalid actor containment capability.');
+  }
   const validateValue = (v: Project['variables'][number], value: Scalar | undefined) => {
     const valid =
       v.type === 'number'
@@ -393,6 +505,8 @@ export function assertState(p: Project, s: GameState): void {
         if (!definitions.has(property.id)) definitions.set(property.id, property);
       template = p.templates.find((t) => t.id === template!.parent);
     }
+    for (const property of p.propertyDefinitions)
+      if (!definitions.has(property.id)) definitions.set(property.id, property);
     for (const property of definitions.values())
       validateValue(property, s.objects[o.id].properties[property.id]);
   }
@@ -416,8 +530,18 @@ export function assertState(p: Project, s: GameState): void {
   for (const c of p.connections)
     if (!s.connections[c.id]) throw new Error('Missing connection state.');
   for (const c of p.characters)
-    if (!p.locations.some((l) => l.id === s.characters[c.id]))
+    if (
+      (!p.locations.some((l) => l.id === s.characters[c.id]) &&
+        !(s.characters[c.id] === '' && ancestry(s, c.id).at(-1)?.kind === 'offstage')) ||
+      effectiveRoom(s, c.id) !== s.characters[c.id]
+    )
       throw new Error('Invalid character location.');
+  for (const c of p.characters) {
+    if (!s.characterProperties[c.id]) throw new Error('Missing character property state.');
+    for (const def of p.propertyDefinitions)
+      if (def.id in s.characterProperties[c.id])
+        validateValue(def, s.characterProperties[c.id][def.id]);
+  }
   if (!Number.isInteger(s.turn) || s.turn < 0 || !Number.isInteger(s.rng))
     throw new Error('Invalid simulation clock.');
   for (const e of s.events)
@@ -425,7 +549,7 @@ export function assertState(p: Project, s: GameState): void {
       throw new Error('Invalid scheduled event.');
 }
 class Refusal extends Error {}
-type EventItem = { name: string; bindings: Bindings; ruleId?: string };
+type EventItem = { name: string; bindings: Bindings; ruleId?: string; instanceId?: string };
 class Transaction {
   output: string[] = [];
   trace: Trace[] = [];
@@ -435,7 +559,7 @@ class Transaction {
   constructor(
     readonly p: Project,
     readonly s: GameState,
-    readonly action: CanonicalAction,
+    public action: CanonicalAction,
     cost: number,
   ) {
     this.resultingTurn = s.turn + cost;
@@ -455,9 +579,10 @@ class Transaction {
     const from = this.s.location;
     this.s.previousLocation = from;
     this.s.location = to;
+    this.s.playerPlacement = { kind: 'location', id: to };
     this.queue.push(
-      { name: 'leave', bindings: { ...b, from, to } },
-      { name: 'enter', bindings: { ...b, from, to } },
+      { name: 'leave', bindings: { ...b, actor: 'player', from, to } },
+      { name: 'enter', bindings: { ...b, actor: 'player', from, to } },
     );
   }
   effects(effects: Effect[], b: Bindings) {
@@ -479,10 +604,12 @@ class Transaction {
             throw new Error('Increment requires numbers.');
           this.s.variables[ref] += e.value;
           break;
-        case 'property':
-          if (!this.s.objects[ref]) throw new Error('Unknown property owner.');
-          this.s.objects[ref].properties[e.key] = e.value;
+        case 'property': {
+          const properties = this.s.objects[ref]?.properties ?? this.s.characterProperties[ref];
+          if (!properties) throw new Error('Unknown property owner.');
+          properties[e.key] = e.value;
           break;
+        }
         case 'state': {
           if (
             !['open', 'locked', 'worn', 'active', 'concealed'].includes(e.key) ||
@@ -496,13 +623,42 @@ class Transaction {
         }
         case 'move': {
           const pl = { ...e.placement, id: resolve(this.s, e.placement.id, b) };
-          if (ref === 'player') this.movePlayer(pl.id, b);
-          else if (this.s.characters[ref]) this.s.characters[ref] = pl.id;
-          else {
+          const oldRooms = Object.fromEntries(
+            ['player', ...Object.keys(this.s.characters)].map((actor) => [
+              actor,
+              effectiveRoom(this.s, actor),
+            ]),
+          );
+          if (ref === 'player') {
+            if (pl.kind === 'location') this.movePlayer(pl.id, b);
+            else {
+              const from = this.s.playerPlacement.id;
+              this.s.playerPlacement = pl;
+              synchronizeActors(this.s);
+              this.queue.push(
+                { name: 'leave', bindings: { ...b, actor: 'player', from, to: pl.id } },
+                { name: 'enter', bindings: { ...b, actor: 'player', from, to: pl.id } },
+              );
+            }
+          } else if (ref in this.s.characters) {
+            this.s.placements[ref] = pl;
+            synchronizeActors(this.s);
+          } else {
             if (!this.s.placements[ref]) throw new Error('Unknown moved object.');
             this.s.placements[ref] = pl;
             this.s.objects[ref].worn = false;
+            synchronizeActors(this.s);
           }
+          if (ref !== 'player')
+            for (const actor of Object.keys(oldRooms)) {
+              const to = effectiveRoom(this.s, actor),
+                from = oldRooms[actor];
+              if (from !== to)
+                this.queue.push(
+                  { name: 'leave', bindings: { ...b, actor, from, to } },
+                  { name: 'enter', bindings: { ...b, actor, from, to } },
+                );
+            }
           break;
         }
         case 'enable':
@@ -525,12 +681,15 @@ class Transaction {
         case 'schedule':
           this.s.events.push({
             id: ref,
+            sequence: ++this.s.eventSequence,
+            instanceId: 'event-' + this.s.eventSequence,
             due: this.resultingTurn + Math.max(1, e.delay),
             bindings: clone(b),
           });
           break;
         case 'cancel':
-          this.s.events = this.s.events.filter((x) => x.id !== ref);
+          this.s.events = this.s.events.filter((x) => x.id !== ref && x.instanceId !== ref);
+          this.queue = this.queue.filter((x) => x.ruleId !== ref && x.instanceId !== ref);
           break;
         case 'emit':
           this.queue.push({ name: ref, bindings: clone(b) });
@@ -539,6 +698,22 @@ class Transaction {
           this.s.rng = (Math.imul(1664525, this.s.rng) + 1013904223) >>> 0;
           const index = Math.floor((this.s.rng / 4294967296) * e.branches.length);
           if (e.branches[index]) this.effects(e.branches[index], b);
+          break;
+        }
+        case 'invoke': {
+          const args = Object.fromEntries(
+            Object.entries(e.arguments).map(([k, v]) => [
+              k,
+              typeof v === 'string' && v.startsWith('$') ? resolve(this.s, v, b) : v,
+            ]),
+          );
+          try {
+            this.perform({ actionId: ref, args });
+          } catch (error) {
+            if (!(error instanceof Refusal)) throw error;
+            if (e.onRefusal === 'stop') throw error;
+            if (e.onRefusal === 'report') this.print(error.message, b);
+          }
           break;
         }
         case 'end':
@@ -557,7 +732,8 @@ class Transaction {
           (ruleId ? r.id === ruleId : r.trigger === trigger) &&
           (!r.once || !this.s.fired.includes(r.id)) &&
           (!r.scope || r.scope === this.s.location || Object.values(b).includes(r.scope)) &&
-          Object.entries(r.bindings).every(([key, value]) => b[key] === value),
+          Object.entries(r.bindings).every(([key, value]) => b[key] === value) &&
+          evaluate(this.p, this.s, r.appliesWhen, b),
       )
       .sort((a, b) => b.priority - a.priority || a.order - b.order || a.id.localeCompare(b.id));
   }
@@ -578,16 +754,104 @@ class Transaction {
       this.log('event', e.name);
       for (const r of this.matching('event', e.name, e.bindings, e.ruleId)) {
         if (this.s.ending) break;
-        if (this.checkRule(r, e.bindings)) this.runRule(r, e.bindings);
+        if (this.checkRule(r, e.bindings)) {
+          try {
+            this.runRule(r, e.bindings);
+          } catch (error) {
+            if (!(error instanceof Refusal)) throw error;
+            this.print(error.message, e.bindings);
+            this.log('event refusal', error.message, false, r.id);
+          }
+        }
       }
+    }
+  }
+  /** All explicit, implicit and invoked actions share this transaction pipeline. */
+  perform(raw: CanonicalAction) {
+    this.tick();
+    const previous = this.action,
+      before = clone(this.s),
+      outputAt = this.output.length,
+      queueAt = this.queue.length;
+    try {
+      const { a, def } = validateAction(this.p, this.s, raw);
+      this.action = a;
+      for (const param of def.parameters) {
+        if (a.args[param.id] === undefined && param.optional) continue;
+        if (param.kind === 'entity' && !['none', 'known'].includes(param.scope)) {
+          const info = scope(this.p, this.s, String(a.args[param.id]));
+          if (!info[param.scope as keyof typeof info])
+            throw new Refusal(
+              param.scope === 'accessible'
+                ? 'You must carry that item where you can reach it.'
+                : 'You cannot reach that from here.',
+            );
+        }
+        if (param.kind === 'entity') {
+          const object = index(this.p).objects.get(String(a.args[param.id])),
+            character = index(this.p).characters.get(String(a.args[param.id]));
+          if (
+            (param.entityKind === 'object' && !object) ||
+            (param.entityKind === 'character' && !character)
+          )
+            throw new Refusal(`That is not a suitable ${param.name.toLowerCase()}.`);
+          if (
+            param.capability &&
+            !object?.capabilities.includes(param.capability as WorldObject['capabilities'][number])
+          )
+            throw new Refusal('That object cannot be used that way.');
+        }
+      }
+      this.log('scope', 'Scope checks passed', true);
+      for (const r of this.matching('check', a.actionId, a.args)) {
+        if (r.effects.length)
+          throw new Error('Requirements cannot execute effects. Resolve the migration item.');
+        if (!this.checkRule(r, a.args)) throw new Refusal(r.otherwise || 'You cannot do that yet.');
+      }
+      const handlers = this.matching('handle', a.actionId, a.args);
+      const handler = handlers.find((r) => this.checkRule(r, a.args));
+      const reportAt = this.output.length;
+      if (handler) {
+        if (handler.outcome === 'refusal')
+          throw new Refusal(handler.otherwise || 'You cannot do that.');
+        this.runRule(handler, a.args);
+      } else {
+        const refusal = handlers.find((r) => r.otherwise);
+        if (refusal) throw new Refusal(refusal.otherwise);
+        this.builtin();
+      }
+      const reportEnd = this.output.length;
+      for (const r of this.matching('after', a.actionId, a.args)) {
+        if (this.s.ending) break;
+        if (this.checkRule(r, a.args)) this.runRule(r, a.args);
+      }
+      let replaced = false;
+      for (const r of this.matching('response', a.actionId, a.args)) {
+        if (this.s.ending) break;
+        if (!this.checkRule(r, a.args)) continue;
+        if (r.responseMode === 'replace') {
+          if (replaced) continue;
+          this.output.splice(reportAt, reportEnd - reportAt);
+          replaced = true;
+        }
+        this.runRule(r, a.args);
+      }
+      assertState(this.p, this.s);
+    } catch (error) {
+      Object.assign(this.s, before);
+      this.output.splice(outputAt);
+      this.queue.splice(queueAt);
+      throw error;
+    } finally {
+      this.action = previous;
     }
   }
   builtin() {
     const { actionId: a, args: b } = this.action,
       p = this.p,
       s = this.s,
-      target = String(b.target ?? ''),
-      tool = String(b.tool ?? ''),
+      target = String(b.destination ?? b.recipient ?? b.target ?? b.item ?? ''),
+      tool = String(b.instrument ?? b.item ?? ''),
       o = p.objects.find((o) => o.id === target),
       os = s.objects[target];
     const requireObject = (cap?: WorldObject['capabilities'][number]) => {
@@ -604,7 +868,7 @@ class Transaction {
         .map((x) => x.name);
     switch (a) {
       case 'look':
-        this.print(describe(p, s, s.location));
+        this.print(describeScene(p, s));
         break;
       case 'inventory':
         this.print(
@@ -629,27 +893,45 @@ class Transaction {
       }
       case 'go': {
         const c = p.connections.find((c) => c.id === b.exit)!;
-        if (c.from !== s.location) throw new Refusal('That exit is not here.');
+        if (!c || c.from !== s.location) throw new Refusal('That exit is not here.');
+        if (
+          s.connections[c.id].concealed ||
+          !evaluate(p, s, c.visibleWhen, b) ||
+          (!illuminated(p, s) && !c.inDark)
+        )
+          throw new Refusal('You cannot find that way here now.');
+        if (s.playerPlacement.kind !== 'location')
+          throw new Refusal('Get out of your current enclosure first.');
         if (!s.connections[c.id].enabled || !evaluate(p, s, c.traverseWhen, b))
           throw new Refusal(c.blocked);
         if (c.doorId) {
           const door = s.objects[c.doorId];
           if (door.locked) throw new Refusal('The way is locked.');
           if (!door.open) {
-            door.open = true;
-            this.print(`You open ${p.objects.find((o) => o.id === c.doorId)!.name}.`);
+            this.perform({ actionId: 'open', args: { target: c.doorId } });
+            if (s.ending) return;
+            if (!s.objects[c.doorId].open) throw new Refusal('The door is still closed.');
             this.log('implicit', 'Open the unlocked shared door', true);
           }
         }
         this.print(c.departure);
         this.movePlayer(c.to, b);
         this.print(c.arrival);
-        this.print(describe(p, s, s.location));
+        this.print(describeScene(p, s));
         break;
       }
       case 'take':
       case 'takeFrom':
-        requireObject('portable');
+        requireObject();
+        if (!o!.capabilities.includes('portable'))
+          throw new Refusal(`${o!.name} is fixed in place.`);
+        {
+          const owner = ancestry(s, target).find((pl) => pl.kind === 'character');
+          if (owner && !index(p).characters.get(owner.id)?.allowsTaking)
+            throw new Refusal('You do not have permission to take their possessions.');
+          if (ancestry(s, 'player').some((pl) => pl.id === target))
+            throw new Refusal('You cannot pick up something you are occupying.');
+        }
         if (
           a === 'takeFrom' &&
           !ancestry(s, target).some(
@@ -664,21 +946,29 @@ class Transaction {
         break;
       case 'drop':
         requireObject();
-        s.placements[target] = { kind: 'location', id: s.location };
+        if (s.placements[target].kind !== 'player')
+          throw new Refusal('You are not holding that directly. Take it out first.');
+        if (os.worn) throw new Refusal('Take it off first.');
+        s.placements[target] = clone(s.playerPlacement);
         os.worn = false;
         this.print(`You set down ${o!.name}.`);
         break;
-      case 'put': {
+      case 'putInside':
+      case 'putOn': {
         requireObject();
-        if (!o!.capabilities.includes('container') && !o!.capabilities.includes('supporter'))
+        if (s.placements[tool]?.kind !== 'player')
+          throw new Refusal('You must hold the item directly.');
+        if (s.objects[tool]?.worn) throw new Refusal('Take it off first.');
+        if (!o!.capabilities.includes(a === 'putInside' ? 'container' : 'supporter'))
           throw new Refusal('That cannot hold objects.');
-        if (o!.capabilities.includes('openable') && !os.open) throw new Refusal('It is closed.');
+        if (a === 'putInside' && o!.capabilities.includes('openable') && !os.open)
+          throw new Refusal('It is closed.');
         if (tool === target || ancestry(s, target).some((pl) => pl.id === tool))
           throw new Refusal('An object cannot contain itself.');
         if (p.objects.filter((x) => s.placements[x.id]?.id === target).length >= o!.capacity)
           throw new Refusal('There is no room for another item.');
         s.placements[tool] = {
-          kind: o!.capabilities.includes('container') ? 'inside' : 'on',
+          kind: a === 'putInside' ? 'inside' : 'on',
           id: target,
         };
         s.objects[tool].worn = false;
@@ -723,16 +1013,131 @@ class Transaction {
         break;
       case 'read':
         requireObject('readable');
+        if (!scope(p, s, target).visible || !illuminated(p, s))
+          throw new Refusal('You cannot see the writing clearly.');
         this.print(o!.readText || 'There is nothing written here.');
         break;
       case 'give': {
-        if (!p.characters.some((c) => c.id === target))
-          throw new Refusal('Give it to a character.');
+        const recipient = p.characters.find((c) => c.id === target);
+        if (!recipient) throw new Refusal('Give it to a character.');
+        if (!recipient.acceptsGifts) throw new Refusal('They decline your gift.');
+        if (s.placements[tool]?.kind !== 'player' || s.objects[tool].worn)
+          throw new Refusal('You must hold the item directly and take it off first.');
         s.placements[tool] = { kind: 'character', id: target };
         s.objects[tool].worn = false;
         this.print('They accept your gift.');
         break;
       }
+      case 'show':
+        if (!p.characters.some((c) => c.id === target))
+          throw new Refusal('Show it to a character.');
+        this.print('They look at what you show them.');
+        break;
+      case 'switchOn':
+      case 'switchOff':
+        requireObject('switchable');
+        if (os.active === (a === 'switchOn'))
+          throw new Refusal(`It is already switched ${os.active ? 'on' : 'off'}.`);
+        os.active = a === 'switchOn';
+        this.print(`You switch ${o!.name} ${os.active ? 'on' : 'off'}.`);
+        break;
+      case 'eat':
+      case 'drink':
+        requireObject(a === 'eat' ? 'edible' : 'drinkable');
+        s.placements[target] = { kind: 'offstage', id: '' };
+        os.worn = false;
+        if (!s.consumed.includes(target)) s.consumed.push(target);
+        this.print(`You ${a} ${o!.name}.`);
+        break;
+      case 'enter': {
+        requireObject('enterable');
+        if (!o!.capabilities.some((c) => c === 'container' || c === 'supporter'))
+          throw new Refusal('That has no space to enter.');
+        const relation = o!.capabilities.includes('container') ? 'inside' : 'on';
+        if (relation === 'inside' && o!.capabilities.includes('openable') && !os.open)
+          throw new Refusal('It is closed.');
+        if (carried(s, target)) throw new Refusal('Put it down first.');
+        if (ancestry(s, 'player').some((pl) => pl.id === target))
+          throw new Refusal('You are already there.');
+        if (Object.values(s.placements).filter((pl) => pl.id === target).length >= o!.capacity)
+          throw new Refusal('There is no room.');
+        const from = s.playerPlacement.id;
+        s.playerPlacement = { kind: relation, id: target };
+        synchronizeActors(s);
+        this.queue.push(
+          { name: 'leave', bindings: { ...b, actor: 'player', from, to: target } },
+          { name: 'enter', bindings: { ...b, actor: 'player', from, to: target } },
+        );
+        this.print(`You get ${relation === 'inside' ? 'into' : 'onto'} ${o!.name}.`);
+        break;
+      }
+      case 'exit': {
+        const pl = s.playerPlacement;
+        if (!['inside', 'on'].includes(pl.kind))
+          throw new Refusal('You are not inside or on anything.');
+        const enclosure = index(p).objects.get(pl.id)!;
+        if (
+          pl.kind === 'inside' &&
+          enclosure.capabilities.includes('openable') &&
+          !s.objects[pl.id].open
+        )
+          throw new Refusal('It is closed. Open it first.');
+        s.playerPlacement = clone(s.placements[pl.id]);
+        synchronizeActors(s);
+        this.queue.push(
+          { name: 'leave', bindings: { actor: 'player', from: pl.id, to: s.playerPlacement.id } },
+          { name: 'enter', bindings: { actor: 'player', from: pl.id, to: s.playerPlacement.id } },
+        );
+        this.print(`You get out of ${enclosure.name}.`);
+        break;
+      }
+      case 'lookIn':
+      case 'search':
+        requireObject();
+        if (!scope(p, s, target).visible) throw new Refusal('You cannot see that here.');
+        if (o!.capabilities.includes('container')) {
+          if (o!.capabilities.includes('openable') && !os.open && !o!.transparent)
+            throw new Refusal('It is closed.');
+          this.print(
+            `Inside: ${
+              p.objects
+                .filter(
+                  (x) =>
+                    s.placements[x.id]?.kind === 'inside' &&
+                    s.placements[x.id].id === target &&
+                    scope(p, s, x.id).visible,
+                )
+                .map((x) => x.name)
+                .join(', ') || 'nothing'
+            }.`,
+          );
+        } else this.print('You find nothing else.');
+        break;
+      case 'lookUnder':
+      case 'lookBehind':
+        this.print('You find nothing else.');
+        break;
+      case 'speak':
+        this.print(`You say, “${b.text}”.${b.recipient ? ' There is no reply.' : ''}`);
+        break;
+      case 'tell':
+        this.print(p.characters.find((c) => c.id === target)?.fallback ?? 'There is no reply.');
+        break;
+      case 'push':
+      case 'pull':
+      case 'turn':
+      case 'touch':
+      case 'listen':
+      case 'smell':
+      case 'taste':
+      case 'knock':
+      case 'attack':
+      case 'cut':
+      case 'climb':
+      case 'use':
+        throw new Refusal(
+          actionCatalog(p).find((x) => x.id === a)?.refusal ?? 'That has no effect.',
+        );
       case 'talk':
       case 'ask':
       case 'askText': {
@@ -767,7 +1172,10 @@ function validateAction(p: Project, s: GameState, raw: unknown) {
     if (!def.parameters.some((p) => p.id === key)) throw new Error('Unexpected action parameter.');
   for (const param of def.parameters) {
     const v = a.args[param.id];
-    if (v === undefined) throw new Error(`Missing ${param.name}.`);
+    if (v === undefined) {
+      if (param.optional) continue;
+      throw new Error(`Missing ${param.name}.`);
+    }
     if (
       (['text', 'entity', 'connection', 'topic'].includes(param.kind) && typeof v !== 'string') ||
       (param.kind === 'number' && typeof v !== 'number') ||
@@ -777,17 +1185,6 @@ function validateAction(p: Project, s: GameState, raw: unknown) {
     if (param.kind === 'entity') {
       const e = [...p.objects, ...p.characters].find((e) => e.id === v);
       if (!e) throw new Error('Invalid entity identifier.');
-      if (
-        (param.entityKind === 'object' && !('capabilities' in e)) ||
-        (param.entityKind === 'character' && !('topics' in e))
-      )
-        throw new Error('Incompatible entity kind.');
-      if (
-        param.capability &&
-        (!('capabilities' in e) ||
-          !e.capabilities.includes(param.capability as WorldObject['capabilities'][number]))
-      )
-        throw new Error('Incompatible parameter capability.');
     }
     if (param.kind === 'connection' && !p.connections.some((c) => c.id === v))
       throw new Error('Invalid connection identifier.');
@@ -835,31 +1232,7 @@ export function execute(p: Project, state: GameState, action: CanonicalAction): 
     tx = new Transaction(p, s, a, def.turnCost);
     let success = true;
     try {
-      for (const param of def.parameters)
-        if (param.kind === 'entity' && !['none', 'known'].includes(param.scope)) {
-          const info = scope(p, s, String(a.args[param.id]));
-          if (!info[param.scope as keyof typeof info])
-            throw new Refusal(
-              param.scope === 'accessible'
-                ? 'You must carry that item where you can reach it.'
-                : 'You cannot reach that from here.',
-            );
-        }
-      tx.log('scope', 'Scope checks passed', true);
-      for (const r of tx.matching('check', a.actionId, a.args))
-        if (!tx.checkRule(r, a.args)) throw new Refusal(r.otherwise || 'You cannot do that yet.');
-      const handlers = tx.matching('handle', a.actionId, a.args);
-      const handler = handlers.find((r) => tx!.checkRule(r, a.args));
-      if (handler) tx.runRule(handler, a.args);
-      else {
-        const refusal = handlers.find((r) => r.otherwise);
-        if (refusal) throw new Refusal(refusal.otherwise);
-        tx.builtin();
-      }
-      for (const r of tx.matching('after', a.actionId, a.args)) {
-        if (s.ending) break;
-        if (tx.checkRule(r, a.args)) tx.runRule(r, a.args);
-      }
+      tx.perform(a);
       tx.drain();
     } catch (e) {
       if (!(e instanceof Refusal)) throw e;
@@ -868,15 +1241,36 @@ export function execute(p: Project, state: GameState, action: CanonicalAction): 
       tx.log('refusal', e.message, false);
     }
     const cost = success || p.failedAttemptsCostTurn ? def.turnCost : 0;
-    s.turn += cost;
-    if (cost && !s.ending) {
-      const due = s.events.filter((e) => e.due <= s.turn);
-      s.events = s.events.filter((e) => e.due > s.turn);
-      due.forEach((e) => tx!.queue.push({ name: 'scheduled', ruleId: e.id, bindings: e.bindings }));
-      tx.drain();
-      tx.queue.push({ name: 'turn', bindings: { ...a.args, action: a.actionId } });
-      tx.drain();
-    }
+    if (s.ending) s.turn += cost;
+    else
+      for (let tick = 0; tick < cost; tick++) {
+        s.turn++;
+        tx.resultingTurn = s.turn;
+        const due = s.events
+          .filter((e) => e.due <= s.turn)
+          .sort(
+            (a, b) =>
+              a.due - b.due ||
+              (p.rules.find((r) => r.id === b.id)?.priority ?? 0) -
+                (p.rules.find((r) => r.id === a.id)?.priority ?? 0) ||
+              a.sequence - b.sequence,
+          );
+        const dueIds = new Set(due.map((e) => e.instanceId));
+        s.events = s.events.filter((e) => !dueIds.has(e.instanceId));
+        due.forEach((e) =>
+          tx!.queue.push({
+            name: 'scheduled',
+            ruleId: e.id,
+            instanceId: e.instanceId,
+            bindings: e.bindings,
+          }),
+        );
+        tx.drain();
+        if (s.ending) break;
+        tx.queue.push({ name: 'turn', bindings: { ...a.args, action: a.actionId } });
+        tx.drain();
+        if (s.ending) break;
+      }
     refreshKnowledge(p, s);
     assertState(p, s);
     tx.log('commit', `${cost} turn${cost === 1 ? '' : 's'} · turn ${s.turn}`, success);
@@ -897,7 +1291,13 @@ export function startGame(p: Project): { state: GameState; output: string[]; tra
   const s: GameState = {
     location: p.start,
     previousLocation: '',
-    placements: Object.fromEntries(p.objects.map((o) => [o.id, clone(o.placement)])),
+    placements: Object.fromEntries([
+      ...p.objects.map((o) => [o.id, clone(o.placement)]),
+      ...p.characters.map((c) => [
+        c.id,
+        clone(c.placement ?? { kind: 'location', id: c.location }),
+      ]),
+    ]),
     objects: Object.fromEntries(
       p.objects.map((o) => [
         o.id,
@@ -912,6 +1312,10 @@ export function startGame(p: Project): { state: GameState; output: string[]; tra
       ]),
     ),
     characters: Object.fromEntries(p.characters.map((c) => [c.id, c.location])),
+    characterProperties: Object.fromEntries(p.characters.map((c) => [c.id, clone(c.properties)])),
+    playerPlacement: { kind: 'location', id: p.start },
+    consumed: [],
+    eventSequence: 0,
     variables: Object.fromEntries(p.variables.map((v) => [v.id, v.initial])),
     connections: Object.fromEntries(
       p.connections.map((c) => [c.id, { enabled: c.enabled, concealed: c.concealed }]),
@@ -934,7 +1338,7 @@ export function startGame(p: Project): { state: GameState; output: string[]; tra
   );
   tx.drain();
   refreshKnowledge(p, s);
-  tx.print(describe(p, s, s.location));
+  tx.print(describeScene(p, s));
   assertState(p, s);
   return { state: s, output: tx.output, trace: tx.trace };
 }

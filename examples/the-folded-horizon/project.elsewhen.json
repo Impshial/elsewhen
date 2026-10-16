@@ -1,47 +1,14 @@
 {
-  "actions": [
-    {
-      "aliases": [
-        "say",
-        "speak"
-      ],
-      "description": "Speak supplied words to a reachable entity.",
-      "examples": [
-        "say \"hello\" to listener"
-      ],
-      "id": "speak",
-      "known": true,
-      "name": "Speak",
-      "notes": "",
-      "parameters": [
-        {
-          "capability": "",
-          "entityKind": "any",
-          "id": "text",
-          "kind": "text",
-          "name": "Words to speak",
-          "scope": "none"
-        },
-        {
-          "capability": "",
-          "entityKind": "any",
-          "id": "target",
-          "kind": "entity",
-          "name": "Listener",
-          "scope": "reachable"
-        }
-      ],
-      "privateExamples": [],
-      "refusal": "Your words fade without an answer.",
-      "turnCost": 1
-    }
-  ],
+  "actions": [],
   "author": "ElseWhen",
   "characters": [
     {
+      "acceptsGifts": true,
+      "adjectives": [],
       "aliases": [
         "archivist"
       ],
+      "allowsTaking": false,
       "description": "Ink stains their hands. Their eyes reflect a sky you cannot see.",
       "fallback": "“Some things even the archive has forgotten.”",
       "greeting": "“You are looking for a way through,” the Archivist says. “Start with the chart. It remembers what I cannot.”",
@@ -49,9 +16,16 @@
       "location": "loc-archive",
       "name": "The Archivist",
       "notes": "",
+      "nouns": [],
+      "plurals": [],
+      "possessionsVisible": true,
+      "pronouns": [
+        "they"
+      ],
       "properties": {},
       "topics": [
         {
+          "adjectives": [],
           "aliases": [
             "observatory",
             "stars",
@@ -67,9 +41,12 @@
           "known": true,
           "name": "The Observatory",
           "notes": "",
+          "nouns": [],
+          "plurals": [],
           "response": "“Read the name written between the stars. The chart will tell you what the observatory needs to hear.”"
         },
         {
+          "adjectives": [],
           "aliases": [
             "gate"
           ],
@@ -83,6 +60,8 @@
           "known": true,
           "name": "The Brass Gate",
           "notes": "",
+          "nouns": [],
+          "plurals": [],
           "response": "“Some doors ask for a key. Others ask you to listen.”"
         }
       ]
@@ -90,6 +69,7 @@
   ],
   "connections": [
     {
+      "adjectives": [],
       "aliases": [
         "arch",
         "cavern"
@@ -108,7 +88,9 @@
       "kind": "passage",
       "name": "Stone Arch",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-arch-back",
       "to": "loc-cavern",
@@ -122,6 +104,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "arch",
         "nexus"
@@ -140,7 +123,9 @@
       "kind": "passage",
       "name": "Stone Arch",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-arch",
       "to": "loc-nexus",
@@ -154,6 +139,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "stair",
         "stairs"
@@ -172,7 +158,9 @@
       "kind": "passage",
       "name": "Spiral Stair",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-stair-back",
       "to": "loc-gate",
@@ -186,6 +174,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "stair",
         "stairs"
@@ -204,7 +193,9 @@
       "kind": "passage",
       "name": "Spiral Stair",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-stair",
       "to": "loc-nexus",
@@ -218,6 +209,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "gate"
       ],
@@ -235,7 +227,9 @@
       "kind": "passage",
       "name": "Brass Gate",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-gate-back",
       "to": "loc-archive",
@@ -249,6 +243,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "gate"
       ],
@@ -266,7 +261,9 @@
       "kind": "passage",
       "name": "Brass Gate",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-gate",
       "to": "loc-gate",
@@ -280,6 +277,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [],
       "arrival": "",
       "blocked": "You cannot go that way yet.",
@@ -295,7 +293,9 @@
       "kind": "wormhole",
       "name": "Wormhole",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": true,
       "reverseId": "",
       "to": "loc-echo",
@@ -309,6 +309,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "fold",
         "return"
@@ -327,7 +328,9 @@
       "kind": "wormhole",
       "name": "Return Fold",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": true,
       "reverseId": "",
       "to": "loc-nexus",
@@ -341,6 +344,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "thread"
       ],
@@ -358,7 +362,9 @@
       "kind": "passage",
       "name": "Silver Thread",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-thread-back",
       "to": "loc-observatory",
@@ -372,6 +378,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "thread"
       ],
@@ -389,7 +396,9 @@
       "kind": "passage",
       "name": "Silver Thread",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "exit-thread",
       "to": "loc-echo",
@@ -403,6 +412,7 @@
       }
     },
     {
+      "adjectives": [],
       "aliases": [
         "seam"
       ],
@@ -420,7 +430,9 @@
       "kind": "rift",
       "name": "Horizon Seam",
       "notes": "",
+      "nouns": [],
       "order": 0,
+      "plurals": [],
       "revealDestination": false,
       "reverseId": "",
       "to": "loc-shore",
@@ -435,12 +447,20 @@
     }
   ],
   "description": "An impossible world. A name written between the stars. A way home.",
+  "endings": [
+    {
+      "id": "homeward",
+      "name": "Homeward"
+    }
+  ],
+  "events": [],
   "failedAttemptsCostTurn": true,
   "format": "elsewhen-project",
   "id": "world-folded-horizon",
   "intro": "You have followed the signal beyond the edge of every chart. Here, distance is a matter of memory, and the horizon folds back on itself. Somewhere in this strange world, a way home is waiting.",
   "locations": [
     {
+      "adjectives": [],
       "aliases": [],
       "category": "Confluence",
       "color": "#edbd62",
@@ -451,7 +471,9 @@
       "id": "loc-nexus",
       "name": "Nexus",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         0,
         0,
@@ -477,6 +499,7 @@
       ]
     },
     {
+      "adjectives": [],
       "aliases": [
         "cavern"
       ],
@@ -489,7 +512,9 @@
       "id": "loc-cavern",
       "name": "Crystal Cavern",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         -1,
         -1,
@@ -500,6 +525,7 @@
       "variants": []
     },
     {
+      "adjectives": [],
       "aliases": [],
       "category": "Place",
       "color": "#eeb45e",
@@ -510,7 +536,9 @@
       "id": "loc-gate",
       "name": "Gate Chamber",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         -6,
         -0.5,
@@ -521,6 +549,7 @@
       "variants": []
     },
     {
+      "adjectives": [],
       "aliases": [],
       "category": "Archive",
       "color": "#59a9ef",
@@ -531,7 +560,9 @@
       "id": "loc-archive",
       "name": "Sunken Archive",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         6,
         0.2,
@@ -542,6 +573,7 @@
       "variants": []
     },
     {
+      "adjectives": [],
       "aliases": [],
       "category": "Dimension",
       "color": "#b587ef",
@@ -552,7 +584,9 @@
       "id": "loc-echo",
       "name": "Echo Dimension",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         4,
         2,
@@ -563,6 +597,7 @@
       "variants": []
     },
     {
+      "adjectives": [],
       "aliases": [],
       "category": "Observatory",
       "color": "#9c86e8",
@@ -573,7 +608,9 @@
       "id": "loc-observatory",
       "name": "Observatory",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         -5,
         2,
@@ -584,6 +621,7 @@
       "variants": []
     },
     {
+      "adjectives": [],
       "aliases": [],
       "category": "Possibility",
       "color": "#62b9da",
@@ -594,7 +632,9 @@
       "id": "loc-shore",
       "name": "Silent Shore",
       "notes": "",
+      "nouns": [],
       "pinned": false,
+      "plurals": [],
       "position": [
         5,
         -1,
@@ -605,10 +645,12 @@
       "variants": []
     }
   ],
+  "migration": [],
   "notes": "",
   "objects": [
     {
       "active": true,
+      "adjectives": [],
       "aliases": [
         "lantern",
         "light"
@@ -625,11 +667,13 @@
       "locked": false,
       "name": "Survey Lantern",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-nexus",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -643,6 +687,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "shard",
         "crystal"
@@ -658,11 +703,13 @@
       "locked": false,
       "name": "Resonance Shard",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-cavern",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -676,6 +723,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "anchor",
         "cradle"
@@ -691,11 +739,13 @@
       "locked": false,
       "name": "Wormhole Anchor",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-nexus",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -709,6 +759,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "case",
         "box"
@@ -725,11 +776,13 @@
       "locked": false,
       "name": "Sealed Case",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-gate",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -743,6 +796,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "token",
         "key"
@@ -758,11 +812,13 @@
       "locked": false,
       "name": "Brass Token",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "obj-case",
         "kind": "inside"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -776,6 +832,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "gate"
       ],
@@ -792,11 +849,13 @@
       "locked": true,
       "name": "Brass Gate",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "exit-gate",
         "kind": "connection"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -810,6 +869,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "chart"
       ],
@@ -824,11 +884,13 @@
       "locked": false,
       "name": "Star Chart",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-archive",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "The observatory listens for a name. Speak Meridian to the Prism Console.",
       "template": "",
@@ -842,6 +904,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "red book",
         "book",
@@ -859,11 +922,13 @@
       "locked": false,
       "name": "Red Ledger",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-archive",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "We mapped every destination except the one we needed.",
       "template": "",
@@ -877,6 +942,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "blue book",
         "book",
@@ -894,11 +960,13 @@
       "locked": false,
       "name": "Blue Ledger",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-archive",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "A door can remember the hand that opens it. A world can remember a name.",
       "template": "",
@@ -912,6 +980,7 @@
     },
     {
       "active": false,
+      "adjectives": [],
       "aliases": [
         "prism",
         "console"
@@ -927,11 +996,13 @@
       "locked": false,
       "name": "Prism Console",
       "notes": "",
+      "nouns": [],
       "open": false,
       "placement": {
         "id": "loc-observatory",
         "kind": "location"
       },
+      "plurals": [],
       "properties": {},
       "readText": "",
       "template": "",
@@ -944,12 +1015,18 @@
       "worn": false
     }
   ],
+  "propertyDefinitions": [],
   "rules": [
     {
+      "adjectives": [],
       "aliases": [],
+      "appliesWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
       "bindings": {
-        "target": "obj-anchor",
-        "tool": "obj-shard"
+        "item": "obj-shard",
+        "target": "obj-anchor"
       },
       "condition": {
         "key": "",
@@ -962,10 +1039,12 @@
       "description": "",
       "effects": [
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "set",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -975,10 +1054,12 @@
           "value": "Active"
         },
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "enable",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -988,10 +1069,12 @@
           "value": true
         },
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "reveal",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1001,10 +1084,12 @@
           "value": null
         },
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "print",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1018,18 +1103,27 @@
       "id": "rule-activate",
       "name": "Activate wormhole",
       "notes": "",
+      "nouns": [],
       "once": false,
       "order": 0,
       "otherwise": "The wormhole is already steady. The shard has done its work.",
+      "outcome": "success",
       "phase": "handle",
+      "plurals": [],
       "priority": 10,
+      "responseMode": "replace",
       "scope": "",
       "trigger": "use"
     },
     {
+      "adjectives": [],
       "aliases": [],
+      "appliesWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
       "bindings": {
-        "target": "obj-console"
+        "recipient": "obj-console"
       },
       "condition": {
         "key": "text",
@@ -1042,10 +1136,12 @@
       "description": "",
       "effects": [
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "set",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1055,10 +1151,12 @@
           "value": true
         },
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "enable",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1068,10 +1166,12 @@
           "value": true
         },
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "reveal",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1081,10 +1181,12 @@
           "value": null
         },
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "print",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1098,16 +1200,25 @@
       "id": "rule-name",
       "name": "Speak the name",
       "notes": "",
+      "nouns": [],
       "once": false,
       "order": 0,
       "otherwise": "The prism returns your words as a faint, unfinished echo.",
+      "outcome": "success",
       "phase": "handle",
+      "plurals": [],
       "priority": 0,
+      "responseMode": "replace",
       "scope": "",
       "trigger": "speak"
     },
     {
+      "adjectives": [],
       "aliases": [],
+      "appliesWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
       "bindings": {
         "to": "loc-shore"
       },
@@ -1118,10 +1229,12 @@
       "description": "",
       "effects": [
         {
+          "arguments": {},
           "branches": [],
           "delay": 1,
           "key": "",
           "kind": "end",
+          "onRefusal": "stop",
           "placement": {
             "id": "",
             "kind": "offstage"
@@ -1135,16 +1248,20 @@
       "id": "rule-home",
       "name": "Homeward",
       "notes": "",
+      "nouns": [],
       "once": true,
       "order": 0,
       "otherwise": "",
+      "outcome": "success",
       "phase": "event",
+      "plurals": [],
       "priority": 0,
+      "responseMode": "replace",
       "scope": "",
       "trigger": "enter"
     }
   ],
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "seed": 4271,
   "start": "loc-nexus",
   "templates": [
@@ -1205,5 +1322,6 @@
       "type": "boolean"
     }
   ],
+  "verbAliases": [],
   "version": "1.0.0"
 }

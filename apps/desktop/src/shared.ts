@@ -1,13 +1,7 @@
 import type { Project } from '../../../packages/domain/src/index';
 import type { SessionView } from './main/session';
 import type { Scenario, ScenarioResult } from '../../../packages/domain/src/scenarios';
-export type Settings = {
-  model: string;
-  enabled: boolean;
-  hasKey: boolean;
-  storage: 'protected' | 'session';
-  timeout: number;
-};
+export type Settings = { showCommandHints: boolean };
 export type Boot = {
   project: Project;
   path: string | null;
@@ -21,6 +15,11 @@ export type Boot = {
 };
 export type HostResult<T> = { ok: true; value: T } | { ok: false; error: string };
 export interface HostMethods {
+  playerBoot: { input: null; output: SessionView };
+  detachPlayer: { input: SessionView['presentation']; output: SessionView };
+  returnPlayer: { input: SessionView['presentation']; output: SessionView };
+  playerPresentation: { input: SessionView['presentation']; output: null };
+  focusPlayer: { input: null; output: null };
   boot: { input: null; output: Boot };
   recoverDraft: { input: string; output: Boot };
   getScenarios: { input: null; output: Scenario[] };
@@ -53,18 +52,7 @@ export interface HostMethods {
   loadGame: { input: null; output: SessionView | null };
   exportTranscript: { input: null; output: string | null };
   settings: { input: null; output: Settings };
-  updateSettings: {
-    input: {
-      model: string;
-      enabled: boolean;
-      timeout: number;
-      key?: string;
-      removeKey?: boolean;
-      remember?: boolean;
-    };
-    output: Settings;
-  };
-  testConnection: { input: null; output: string };
+  updateSettings: { input: Settings; output: Settings };
 }
 export type HostAPI = {
   invoke: <K extends keyof HostMethods>(
@@ -72,6 +60,7 @@ export type HostAPI = {
     payload: HostMethods[K]['input'],
   ) => Promise<HostResult<HostMethods[K]['output']>>;
   onMenu: (callback: (action: string) => void) => () => void;
+  onSession: (callback: (session: SessionView | null) => void) => () => void;
 };
 declare global {
   interface Window {

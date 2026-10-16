@@ -7,6 +7,7 @@ import {
   type Project,
   type Rule,
   type Scalar,
+  type Variable,
 } from '../../../../packages/domain/src/index';
 import { Button, Icon, Select, TextField, Toggle } from './components';
 import { useEditor } from './store';
@@ -21,7 +22,9 @@ const entityOptions = (p: Project) => [
   ),
   ...p.actions.map((a) => ({ value: a.id, label: `${a.name} · Action` })),
   { value: '$target', label: 'Action target' },
-  { value: '$tool', label: 'Action tool' },
+  ...['item', 'instrument', 'destination', 'source', 'recipient', 'actor', 'from', 'to'].map(
+    (role) => ({ value: '$' + role, label: 'Supplied ' + role }),
+  ),
   { value: '$location', label: 'Current location' },
   { value: 'player', label: 'Player' },
 ];
@@ -30,18 +33,49 @@ export function ScalarInput({
   value,
   onChange,
   type,
+  definition,
 }: {
   label: string;
   value: Scalar;
   onChange: (v: Scalar) => void;
   type?: string;
+  definition?: Variable;
 }) {
+  const p = useEditor((s) => s.project);
+  type = definition?.type ?? type;
+  if (type === 'entity')
+    return (
+      <Select
+        label={label}
+        value={String(value ?? '')}
+        options={[
+          { value: '', label: 'None' },
+          ...[...p.locations, ...p.objects, ...p.characters].map((e) => ({
+            value: e.id,
+            label: e.name,
+          })),
+        ]}
+        onChange={(v) => onChange(v || null)}
+      />
+    );
+  if (type === 'enum')
+    return (
+      <Select
+        label={label}
+        value={String(value ?? '')}
+        options={definition?.options ?? []}
+        onChange={onChange}
+      />
+    );
   return typeof value === 'boolean' || type === 'boolean' ? (
     <Select
       label={label}
       value={String(value ?? false)}
       onChange={(v) => onChange(v === 'true')}
-      options={['true', 'false']}
+      options={[
+        { value: 'true', label: 'Yes' },
+        { value: 'false', label: 'No' },
+      ]}
     />
   ) : (
     <TextField
@@ -222,9 +256,22 @@ export function ConditionEditor({
             />
           )}{' '}
           {['property', 'argument'].includes(value.source) && (
-            <TextField
+            <Select
               label="Property / parameter"
               value={value.key}
+              options={
+                value.source === 'property'
+                  ? [...p.propertyDefinitions, ...p.templates.flatMap((t) => t.properties)].map(
+                      (v) => ({ value: v.id, label: v.name }),
+                    )
+                  : [
+                      ...new Map(
+                        actionCatalog(p)
+                          .flatMap((a) => a.parameters)
+                          .map((v) => [v.id, { value: v.id, label: v.name }]),
+                      ).values(),
+                    ]
+              }
               onChange={(key) => onChange({ ...value, key })}
             />
           )}
@@ -253,6 +300,15 @@ export function ConditionEditor({
             <ScalarInput
               label="Value"
               value={value.value}
+              definition={
+                value.source === 'variable'
+                  ? p.variables.find((v) => v.id === value.ref)
+                  : value.source === 'property'
+                    ? [...p.propertyDefinitions, ...p.templates.flatMap((t) => t.properties)].find(
+                        (v) => v.id === value.key,
+                      )
+                    : undefined
+              }
               onChange={(v) => onChange({ ...value, value: v })}
             />
           )}
@@ -290,6 +346,7 @@ export function ConditionEditor({
   );
 }
 const effectLabels: Record<Effect['kind'], string> = {
+  invoke: 'Invoke action',
   print: 'Display text',
   set: 'Set variable',
   increment: 'Change number',
@@ -351,6 +408,10 @@ export function EffectsEditor({
                 <ScalarInput
                   label={e.kind === 'increment' ? 'Amount' : 'Value'}
                   value={e.value}
+                  definition={
+                    e.kind === 'set' ? p.variables.find((v) => v.id === e.ref) : undefined
+                  }
+                  type={e.kind === 'increment' ? 'number' : undefined}
                   onChange={(value) => change(i, { value })}
                 />
               </>
@@ -365,10 +426,31 @@ export function EffectsEditor({
             )}
             {e.kind === 'property' && (
               <>
-                <TextField label="Property" value={e.key} onChange={(key) => change(i, { key })} />
+                <Select
+                  label="Property"
+                  value={e.key}
+                  options={[
+                    ...p.propertyDefinitions,
+                    ...p.templates.flatMap((t) => t.properties),
+                  ].map((v) => ({ value: v.id, label: v.name }))}
+                  onChange={(key) =>
+                    change(i, {
+                      key,
+                      value:
+                        [
+                          ...p.propertyDefinitions,
+                          ...p.templates.flatMap((t) => t.properties),
+                        ].find((v) => v.id === key)?.initial ?? '',
+                    })
+                  }
+                />
                 <ScalarInput
                   label="Value"
                   value={e.value}
+                  definition={[
+                    ...p.propertyDefinitions,
+                    ...p.templates.flatMap((t) => t.properties),
+                  ].find((v) => v.id === e.key)}
                   onChange={(value) => change(i, { value })}
                 />
               </>
@@ -439,10 +521,69 @@ export function EffectsEditor({
               />
             )}
             {e.kind === 'emit' && (
-              <TextField label="Event name" value={e.ref} onChange={(ref) => change(i, { ref })} />
+              <Select
+                label="Event"
+                value={e.ref}
+                options={p.events.map((e) => ({ value: e.id, label: e.name }))}
+                onChange={(ref) => change(i, { ref })}
+              />
             )}
             {e.kind === 'end' && (
-              <TextField label="Ending ID" value={e.ref} onChange={(ref) => change(i, { ref })} />
+              <Select
+                label="Ending"
+                value={e.ref}
+                options={p.endings.map((e) => ({ value: e.id, label: e.name }))}
+                onChange={(ref) => change(i, { ref })}
+              />
+            )}
+            {e.kind === 'invoke' && (
+              <>
+                <Select
+                  label="Action to invoke"
+                  value={e.ref}
+                  options={actionCatalog(p).map((a) => ({ value: a.id, label: a.name }))}
+                  onChange={(ref) => change(i, { ref, arguments: {} })}
+                />
+                {actionCatalog(p)
+                  .find((a) => a.id === e.ref)
+                  ?.parameters.map((param) =>
+                    ['entity', 'connection', 'topic'].includes(param.kind) ? (
+                      <Select
+                        key={param.id}
+                        label={param.name}
+                        value={String(e.arguments[param.id] ?? '')}
+                        options={entityOptions(p)}
+                        onChange={(value) =>
+                          change(i, { arguments: { ...e.arguments, [param.id]: value } })
+                        }
+                      />
+                    ) : (
+                      <TextField
+                        key={param.id}
+                        label={param.name}
+                        value={String(e.arguments[param.id] ?? '')}
+                        onChange={(value) =>
+                          change(i, {
+                            arguments: {
+                              ...e.arguments,
+                              [param.id]: param.kind === 'number' ? Number(value) : value,
+                            },
+                          })
+                        }
+                      />
+                    ),
+                  )}
+                <Select
+                  label="If the invoked action refuses"
+                  value={e.onRefusal}
+                  options={[
+                    { value: 'stop', label: 'Stop this handler' },
+                    { value: 'report', label: 'Report refusal and continue' },
+                    { value: 'ignore', label: 'Continue quietly' },
+                  ]}
+                  onChange={(v) => change(i, { onRefusal: v as Effect['onRefusal'] })}
+                />
+              </>
             )}
             {['print', 'end'].includes(e.kind) && (
               <TextField
@@ -470,6 +611,30 @@ export function EffectsEditor({
                   Branch
                 </Button>
               </div>
+            )}
+            {['print', 'end'].includes(e.kind) && (
+              <Select
+                label="Insert text token"
+                value=""
+                options={[
+                  { value: '', label: 'Insert a name or value…' },
+                  ...entityOptions(p)
+                    .filter((o) => o.value)
+                    .map((o) => ({
+                      value: '{{name:' + o.value + '}}',
+                      label: o.label + ' · name',
+                    })),
+                  ...p.variables.map((v) => ({
+                    value: '{{variable:' + v.id + '}}',
+                    label: v.name + ' · value',
+                  })),
+                  ...['text', 'number'].map((role) => ({
+                    value: '{{argument:' + role + '}}',
+                    label: 'Supplied ' + role,
+                  })),
+                ]}
+                onChange={(token) => change(i, { text: e.text + token })}
+              />
             )}
           </div>
           <div className="effect-tools">
@@ -556,6 +721,7 @@ export function RuleEditor({ rule }: { rule: Rule }) {
                 { value: 'check', label: 'Check · requirement' },
                 { value: 'handle', label: 'Handle · action outcome' },
                 { value: 'after', label: 'After · successful action' },
+                { value: 'response', label: 'Response · customize narration' },
                 { value: 'event', label: 'Event · world behavior' },
               ]}
               onChange={(phase) =>
@@ -567,11 +733,17 @@ export function RuleEditor({ rule }: { rule: Rule }) {
               }
             />
             {rule.phase === 'event' ? (
-              <TextField
+              <Select
                 label="Event trigger"
                 value={rule.trigger}
                 onChange={(trigger) => update({ trigger })}
-                hint="start, enter, leave, turn, or a named event"
+                options={[
+                  ...['start', 'enter', 'leave', 'turn', 'scheduled'].map((value) => ({
+                    value,
+                    label: value[0].toUpperCase() + value.slice(1),
+                  })),
+                  ...p.events.map((e) => ({ value: e.id, label: e.name })),
+                ]}
               />
             ) : (
               <Select
@@ -657,6 +829,12 @@ export function RuleEditor({ rule }: { rule: Rule }) {
           <strong>IF</strong>
         </div>
         <div className="rule-content">
+          <h4>Applies when</h4>
+          <ConditionEditor
+            value={rule.appliesWhen}
+            onChange={(appliesWhen) => update({ appliesWhen })}
+          />
+          <h4>{rule.phase === 'check' ? 'Requirement' : 'Condition'}</h4>
           <ConditionEditor value={rule.condition} onChange={(condition) => update({ condition })} />
         </div>
       </div>
@@ -666,10 +844,12 @@ export function RuleEditor({ rule }: { rule: Rule }) {
           <strong>THEN</strong>
         </div>
         <div className="rule-content">
-          {rule.phase === 'check' ? (
+          {rule.phase === 'check' || (rule.phase === 'handle' && rule.outcome === 'refusal') ? (
             <div className="success-note">
               <Icon name="check" />
-              Allow the action to continue
+              {rule.outcome === 'refusal'
+                ? 'Report the refusal without committing effects'
+                : 'Allow the action to continue'}
             </div>
           ) : (
             <EffectsEditor value={rule.effects} onChange={(effects) => update({ effects })} />
@@ -698,6 +878,28 @@ export function RuleEditor({ rule }: { rule: Rule }) {
         </div>
       )}
       <div className="form-grid rule-settings">
+        {rule.phase === 'handle' && (
+          <Select
+            label="Instead outcome"
+            value={rule.outcome}
+            options={[
+              { value: 'success', label: 'Successful action' },
+              { value: 'refusal', label: 'Refuse without changing the world' },
+            ]}
+            onChange={(v) => update({ outcome: v as Rule['outcome'] })}
+          />
+        )}
+        {rule.phase === 'response' && (
+          <Select
+            label="Report behavior"
+            value={rule.responseMode}
+            options={[
+              { value: 'replace', label: 'Replace standard report' },
+              { value: 'append', label: 'Append to standard report' },
+            ]}
+            onChange={(v) => update({ responseMode: v as Rule['responseMode'] })}
+          />
+        )}
         <TextField label="Rule name" value={rule.name} onChange={(name) => update({ name })} />
         <TextField
           label="Priority"

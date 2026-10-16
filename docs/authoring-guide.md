@@ -1,53 +1,39 @@
-# Build a small world
+# Authoring guide
 
-Start ElseWhen and choose **Create a world**. A valid starting location, **The Beginning**, is created for you. The sample is also a writable in-memory copy: opening it never changes the bundled example.
+## Build a world
 
-## Places and connections
+Choose Create a world. The World Explorer groups Locations, Objects, Characters, Connections, Custom Actions, Rules & events, Variables and Reusable types. Add Entity creates a named record with an internal stable ID.
 
-1. Select **The Beginning** in the explorer. Change its name and description. Descriptions support paragraphs and safe emphasis; raw HTML is displayed as text.
-2. Click the **+** beside **Locations** and create **The Gallery**. Its general form controls category, region, darkness, starting visibility, color, and map appearance.
-3. Add a **Connection**. Name it **Silver Door**, select The Beginning as its source and The Gallery as its destination. Choose the kind and whether to create a return connection.
-4. A connection is a directed edge. A reverse pair is two linked edges; their availability can differ. A shared door object gives both sides the same open/locked state. Names such as portal, dream, passage, and wormhole describe the connection without imposing physical floor-plan rules.
+A location's type and region organize the authoring world. Map icon and color affect appearance; coordinates never create exits. Add directed connections, choose a direction when appropriate, and pair reverse routes explicitly. New ordinary connections reveal their destination name; hidden routes can conceal it.
 
-Open **World map** to rotate, pan, and zoom. Click a location to inspect it; double-click it to open its editor. Select an edge to edit its endpoints and conditions. **Frame all** resets the view. Top, Front, and Side use orthographic cameras. Use **2D** for an SVG graph without WebGL, or the list view for keyboard access. In 2D, Shift-drag moves a node. The location inspector also accepts exact X/Y/Z coordinates. **Auto arrange** changes unpinned positions and can be undone.
+## Vocabulary
 
-Ctrl/Cmd-click adds locations to the selection; **Frame selection** centers them. **Move selected location** enables a three-axis translation gizmo in the 3D and orthographic views. **Snap** rounds placement to whole layout coordinates. **Connect selected location** starts a connection operation: select its destination, then name it in the connection dialog. Escape cancels connection creation or exits the move tool. Right-click the canvas for **Add location**. The region selector filters designer nodes without changing travel rules. Player mode also offers **Focus current location** and exact-exit **Travel** after selecting an outgoing edge or its list entry.
+Names are understood automatically. Add aliases, noun phrases, adjectives and plural forms as chips. Tags, notes, regions and description prose are not parser vocabulary. Vocabulary browses standard forms, maps a verb synonym to a specific form, and previews a command without executing it.
 
-## A container puzzle
+## Objects and characters
 
-1. Add an object named **Tin Box** at The Beginning. Enable **Container** and **Openable**; leave its initial open state unchecked.
-2. Add **Glass Bead**, enable **Portable**, choose **Inside** placement, and select Tin Box as its parent.
-3. Start **Playtest**. Enter `open tin box`, then `take glass bead from tin box`. The inventory and trace update from the actual engine result.
+Choose capabilities using plain labels: can be picked up, can hold things inside, can hold things on top, can be opened/locked/worn/entered, has writing, emits light, can be switched on/off, can be eaten/drunk, scenery or shared door. Select a key by name and choose initial state. Contents and placement form one hierarchy.
 
-Closed opaque containers hide their contents. Transparent closed containers allow sight but prevent reaching inside. A carried bag's contents are transitively carried, but still must be accessible. Supporters hold objects **on** them. Moving through the placement form preserves stable object IDs and their references.
+For a drawer puzzle, create a key, an openable/lockable container, select the key, mark the drawer locked, and place the photograph inside. The standard Take, Unlock, Open and Take from actions do the rest.
 
-## Variables and rules
+Characters have explicit pronouns, possession visibility/permission, gift acceptance, greetings, topics and conditional responses. Named property definitions are created in Vocabulary and selected in property overrides and rules.
 
-Create a boolean variable, such as **Gallery lit**, initially false. Add a rule and use the visual blocks:
+## Custom actions and behavior
 
-- **WHEN:** choose a phase, action, and optional bindings. Binding a tool or target narrows the rule to those entities; an empty binding matches any value.
-- **IF:** combine conditions using All, Any, or Not. Test possession, reachability, discovery, object state, variable values, and action arguments.
-- **THEN:** add ordered effects, such as setting the variable and printing authored text. Effects can move entities, reveal/enable connections, schedule events, change properties, choose deterministic random branches, or end the story.
-- **OTHERWISE:** supply an authored refusal when the requirement is not met.
+Create a Custom Action. Choose a verb phrase and command shape, then Add command form. Add alternate verbs/forms using the same role chips. Role labels, types and access constraints describe what the player supplies. Configure turn cost and a default refusal.
 
-Check rules impose requirements; one matching Handle rule supplies the outcome; After rules add successful-action behavior. Event rules react to start, enter, leave, turn, or named events. Priority, author order, and stable ID determine ordering. See [engine semantics](engine-semantics.md) before combining several handlers.
+Add requirement, consequences, After rule or response to open the shared visual rule editor. Entity-local Rules links point to these same global records. Requirements cannot perform effects. Instead outcomes can explicitly refuse. Response rules customize narration while preserving the standard operation.
 
-The sample's **Activate wormhole** rule is a working example. It binds `use` to the Resonance Shard and Wormhole Anchor, requires the Dormant variable value, then changes that value and reveals/enables the wormhole.
+Create named events, endings and typed entity properties in Vocabulary, then choose them in rule controls. Invoke action runs another action through normal checks; choose how a refusal affects the current handler. Insert text token adds a name, variable or supplied-text reference without typing token syntax.
 
-## Characters and reusable types
+## Play and test
 
-Characters have a location, description, greeting, fallback response, and dialogue topics. Each topic has aliases, an availability condition, authored response, and response effects. `talk to archivist` uses the greeting; `ask archivist about observatory` resolves a known topic. Unknown subjects use the authored fallback unless a rule handles `askText`.
+Playtest starts an immutable compiled snapshot. Editing the designer does not change the running story; restart to compile current edits. The Action inspector distinguishes interpretation, questions, refusals, rules and changes. Technical IDs are available in expandable diagnostic details.
 
-Reusable types supply inherited capabilities and typed property defaults. Child defaults override parent defaults; object values override both. Custom actions define typed parameters, scope, examples, aliases, turn cost, and default refusal. The conventional syntax for a custom alias uses `|` between parameter values; the sample also supports `say "Meridian" to prism console`.
+Open Game Player moves the current playtest into a native window containing the transcript, inventory and discovered-world map. Return to designer or close that window to reattach. Designer edits remain available while it is detached.
 
-## Play, inspect, and preserve your work
+Story tests run in isolated sessions. Add assertions for an action, selected entity, question, refusal, location, inventory, state/property, variable, turn, ending or output text. Expected questions/refusals count as successful tests when their assertions pass. Save tests separately before switching projects.
 
-Playtest compiles a snapshot. **Design** returns to authoring without losing the session; **Resume playtest** continues the same snapshot. A notice appears if the source changed. **Restart** recompiles current authoring data. The debugger shows canonical intent, rule checks, effects, state changes, and parser diagnostics. Designer controls can teleport, grant objects, change variables, or reveal the map; these edits are undoable and do not modify the source.
+## Export and upgrade
 
-Use **Story tests** to create a sequence of conventional commands and an optional expected ending. **Run scenario** uses an isolated session; **Save tests** writes a separate scenarios file. Save tests before leaving this editor. Scenarios are not exported to players.
-
-Save your project as `project.elsewhen.json`. Editor undo/redo is separate from player undo/redo. Saving creates rolling backups. Unsaved edits are recovered separately after a delay; reopening a saved project offers newer recovery data. A restored project remains marked unsaved until you save it. Use **Save As** to resolve external file changes or make a writable copy of a read-only project.
-
-After restarting, the welcome screen lists recoverable drafts that were never saved to a source file. Closing an edited project asks whether to save, close with recovery retained, or cancel.
-
-The project-title dialog edits title, author, version, and opening text. Its **Export game** command produces an `.elsegame` package. Players open it with ElseWhen and can save progress as `.elsesave`. They need neither your source folder nor an API key for conventional play.
+Save source projects for continued editing. Export game creates an offline .elsegame package for the ElseWhen player. Review upgrade notices in Vocabulary and use Save As for migrated source files. Dark/light theme, transcript text size, search and follow controls work in the player.

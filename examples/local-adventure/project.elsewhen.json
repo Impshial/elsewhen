@@ -1,0 +1,726 @@
+{
+  "actions": [
+    {
+      "adjectives": [],
+      "aliases": [],
+      "description": "Ring an accessible bell.",
+      "examples": [],
+      "forms": [
+        {
+          "id": "ring-target",
+          "parts": [
+            {
+              "kind": "literal",
+              "text": "ring"
+            },
+            {
+              "kind": "role",
+              "role": "target"
+            }
+          ]
+        }
+      ],
+      "id": "ring",
+      "known": true,
+      "name": "Ring",
+      "notes": "",
+      "nouns": [],
+      "parameters": [
+        {
+          "capability": "",
+          "entityKind": "any",
+          "id": "target",
+          "kind": "entity",
+          "name": "Bell",
+          "optional": false,
+          "scope": "reachable"
+        }
+      ],
+      "plurals": [],
+      "privateExamples": [],
+      "refusal": "That does not ring.",
+      "turnCost": 1
+    }
+  ],
+  "author": "",
+  "characters": [
+    {
+      "acceptsGifts": true,
+      "adjectives": [],
+      "aliases": [],
+      "allowsTaking": false,
+      "description": "",
+      "fallback": "They have nothing to say about that.",
+      "greeting": "Welcome to the courtyard.",
+      "id": "caretaker",
+      "location": "courtyard",
+      "name": "Caretaker",
+      "notes": "",
+      "nouns": [],
+      "plurals": [],
+      "possessionsVisible": true,
+      "pronouns": [
+        "they"
+      ],
+      "properties": {},
+      "topics": [
+        {
+          "adjectives": [],
+          "aliases": [
+            "photo",
+            "photograph"
+          ],
+          "condition": {
+            "conditions": [],
+            "kind": "all"
+          },
+          "description": "",
+          "effects": [],
+          "id": "photo-topic",
+          "known": true,
+          "name": "The photograph",
+          "notes": "",
+          "nouns": [],
+          "plurals": [],
+          "response": "That was taken before the clock stopped."
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "adjectives": [],
+      "aliases": [
+        "doorway"
+      ],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "north",
+      "doorId": "door",
+      "enabled": true,
+      "from": "room",
+      "id": "north",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Rusty doorway",
+      "notes": "",
+      "nouns": [],
+      "order": 0,
+      "plurals": [],
+      "revealDestination": true,
+      "reverseId": "",
+      "to": "courtyard",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "adjectives": [],
+      "aliases": [],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "east",
+      "doorId": "",
+      "enabled": true,
+      "from": "room",
+      "id": "east",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Maintenance passage",
+      "notes": "",
+      "nouns": [],
+      "order": 0,
+      "plurals": [],
+      "revealDestination": true,
+      "reverseId": "",
+      "to": "maintenance",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "adjectives": [],
+      "aliases": [],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "west",
+      "doorId": "",
+      "enabled": true,
+      "from": "maintenance",
+      "id": "west",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Sitting room passage",
+      "notes": "",
+      "nouns": [],
+      "order": 0,
+      "plurals": [],
+      "revealDestination": true,
+      "reverseId": "",
+      "to": "room",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    },
+    {
+      "adjectives": [],
+      "aliases": [],
+      "arrival": "",
+      "blocked": "You cannot go that way yet.",
+      "concealed": false,
+      "departure": "",
+      "description": "",
+      "direction": "south",
+      "doorId": "door",
+      "enabled": true,
+      "from": "courtyard",
+      "id": "south",
+      "inDark": true,
+      "kind": "passage",
+      "name": "Maintenance doorway",
+      "notes": "",
+      "nouns": [],
+      "order": 0,
+      "plurals": [],
+      "revealDestination": true,
+      "reverseId": "",
+      "to": "room",
+      "traverseWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      }
+    }
+  ],
+  "description": "",
+  "endings": [
+    {
+      "id": "welcome",
+      "name": "A welcome home"
+    }
+  ],
+  "events": [],
+  "failedAttemptsCostTurn": false,
+  "format": "elsewhen-project",
+  "id": "local-adventure",
+  "intro": "A bell rings beyond the locked courtyard door.",
+  "locations": [
+    {
+      "adjectives": [],
+      "aliases": [],
+      "category": "Place",
+      "color": "#24c7c8",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "A desk stands by a sturdy drawer. A rusty door leads north.",
+      "icon": "pin",
+      "id": "room",
+      "name": "Sitting Room",
+      "notes": "",
+      "nouns": [],
+      "pinned": false,
+      "plurals": [],
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "adjectives": [],
+      "aliases": [],
+      "category": "Place",
+      "color": "#24c7c8",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "The caretaker waits beneath a flowering tree.",
+      "icon": "pin",
+      "id": "courtyard",
+      "name": "Courtyard",
+      "notes": "",
+      "nouns": [],
+      "pinned": false,
+      "plurals": [],
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    },
+    {
+      "adjectives": [],
+      "aliases": [],
+      "category": "Place",
+      "color": "#24c7c8",
+      "dark": false,
+      "darkDescription": "It is too dark to see.",
+      "description": "Shelves of spare parts line the walls. The sitting room lies west.",
+      "icon": "pin",
+      "id": "maintenance",
+      "name": "Maintenance Room",
+      "notes": "",
+      "nouns": [],
+      "pinned": false,
+      "plurals": [],
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "region": "",
+      "tags": [],
+      "variants": []
+    }
+  ],
+  "migration": [],
+  "notes": "",
+  "objects": [
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "drawer"
+      ],
+      "capabilities": [
+        "container",
+        "openable",
+        "lockable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "drawer",
+      "keyId": "key",
+      "locked": true,
+      "name": "Maintenance Drawer",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "room",
+        "kind": "location"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [
+        "small"
+      ],
+      "aliases": [
+        "key"
+      ],
+      "capabilities": [
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "key",
+      "keyId": "",
+      "locked": false,
+      "name": "Brass Key",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "room",
+        "kind": "location"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "photo"
+      ],
+      "capabilities": [
+        "portable",
+        "readable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "photo",
+      "keyId": "",
+      "locked": false,
+      "name": "Photograph",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "drawer",
+        "kind": "inside"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "The caretaker smiles beside the bell.",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "door"
+      ],
+      "capabilities": [
+        "door",
+        "openable",
+        "lockable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "door",
+      "keyId": "key",
+      "locked": true,
+      "name": "Rusty Door",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "north",
+        "kind": "connection"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "desk"
+      ],
+      "capabilities": [
+        "supporter",
+        "scenery"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "desk",
+      "keyId": "",
+      "locked": false,
+      "name": "Writing Desk",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "room",
+        "kind": "location"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "lamp"
+      ],
+      "capabilities": [
+        "light",
+        "switchable",
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "lamp",
+      "keyId": "",
+      "locked": false,
+      "name": "Desk Lamp",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "desk",
+        "kind": "on"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "case"
+      ],
+      "capabilities": [
+        "container",
+        "openable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "case",
+      "keyId": "",
+      "locked": false,
+      "name": "Glass Case",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "room",
+        "kind": "location"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": true,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "coin"
+      ],
+      "capabilities": [
+        "portable"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "coin",
+      "keyId": "",
+      "locked": false,
+      "name": "Silver Coin",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "case",
+        "kind": "inside"
+      },
+      "plurals": [
+        "coins"
+      ],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    },
+    {
+      "active": false,
+      "adjectives": [],
+      "aliases": [
+        "bell"
+      ],
+      "capabilities": [
+        "scenery"
+      ],
+      "capacity": 10,
+      "concealed": false,
+      "description": "",
+      "id": "bell",
+      "keyId": "",
+      "locked": false,
+      "name": "Brass Bell",
+      "notes": "",
+      "nouns": [],
+      "open": false,
+      "placement": {
+        "id": "courtyard",
+        "kind": "location"
+      },
+      "plurals": [],
+      "properties": {},
+      "readText": "",
+      "template": "",
+      "transparent": false,
+      "variants": [],
+      "visibleWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "worn": false
+    }
+  ],
+  "propertyDefinitions": [],
+  "rules": [
+    {
+      "adjectives": [],
+      "aliases": [],
+      "appliesWhen": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "bindings": {
+        "target": "bell"
+      },
+      "condition": {
+        "conditions": [],
+        "kind": "all"
+      },
+      "description": "",
+      "effects": [
+        {
+          "arguments": {},
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "set",
+          "onRefusal": "stop",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "rang",
+          "text": "",
+          "value": true
+        },
+        {
+          "arguments": {},
+          "branches": [],
+          "delay": 1,
+          "key": "",
+          "kind": "print",
+          "onRefusal": "stop",
+          "placement": {
+            "id": "",
+            "kind": "offstage"
+          },
+          "ref": "",
+          "text": "The bell rings. The caretaker smiles.",
+          "value": null
+        }
+      ],
+      "enabled": true,
+      "id": "ring-bell",
+      "name": "Ring the courtyard bell",
+      "notes": "",
+      "nouns": [],
+      "once": false,
+      "order": 0,
+      "otherwise": "",
+      "outcome": "success",
+      "phase": "handle",
+      "plurals": [],
+      "priority": 0,
+      "responseMode": "replace",
+      "scope": "",
+      "trigger": "ring"
+    }
+  ],
+  "schemaVersion": 2,
+  "seed": 4271,
+  "start": "room",
+  "templates": [],
+  "title": "The Courtyard",
+  "variables": [
+    {
+      "id": "rang",
+      "initial": false,
+      "max": null,
+      "min": null,
+      "name": "Bell rung",
+      "notes": "",
+      "options": [],
+      "public": false,
+      "type": "boolean"
+    }
+  ],
+  "verbAliases": [],
+  "version": "1.0.0"
+}

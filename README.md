@@ -1,66 +1,59 @@
 # ElseWhen
 
-A Windows-first desktop studio for creating and playing interactive fiction. Build a world out of caves, dreams, dimensions, or moments in time. Connect its places, write its rules, and step into the story.
+ElseWhen is a Windows-first desktop studio for traditional parser-based interactive fiction. Create locations, objects, characters, vocabulary and visual rules, then play your story with a transcript, inventory and interactive 2D/3D map. Both dark and light themes are included.
 
-ElseWhen uses an authoritative local game engine. OpenAI can interpret a player's language, but cannot invent entities, change state, or decide a puzzle's outcome. Conventional commands work offline.
+Version 0.2 uses a deterministic local English parser. Authoring, interpretation, tests, export, save and restore work offline. No account, model or API key is involved.
 
-![ElseWhen's dark world-map designer](docs/images/world-map-dark.png)
-
-[Light theme](docs/images/world-map-light.png) · [Playtest debugger](docs/images/rule-playtest.png)
+![ElseWhen world map](docs/images/world-map-dark.png)
 
 ## Run
 
-Use Node.js 22.12+ (24 LTS recommended) and pnpm 11.25.0.
+Use Node.js 22.12 or newer and pnpm 11.25.0.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-On the welcome screen, choose **Create a world** or **Explore the sample**. The included _The Folded Horizon_ is a complete short adventure. Use the sun/moon button to switch themes; the preference persists.
+Choose **Create a world** or **Explore the sample**. Open the additional **The Courtyard** project in examples/local-adventure/project.elsewhen.json for a small locked-drawer puzzle and a custom bell interaction.
 
-The source project is `project.elsewhen.json`. Save a source project to continue authoring; export an `.elsegame` to distribute a playable game. Players use ElseWhen's **Open a game** command. The exported package contains everything needed for offline play, but does not contain the ElseWhen executable.
+**Vocabulary** browses standard actions, maps synonyms to specific command forms and previews interpretation. **Custom Actions** uses sentence shapes and role chips. **Rules & events** supplies requirements, consequences, responses and scheduled behavior. **Story tests** runs isolated command sequences with visual assertions.
 
-## Development commands
+In playtest, **Open Game Player** moves the existing session to a separate native window. Return it to the designer or close that window to reattach it. The session, pending question, history and unfinished input remain available.
 
-| Command                   | Purpose                                                                    |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `pnpm dev`                | Launch Electron with the Vite development renderer                         |
-| `pnpm typecheck`          | Check the shared types and application                                     |
-| `pnpm lint`               | Run ESLint                                                                 |
-| `pnpm test`               | Run deterministic engine, parser, compiler, persistence, and session tests |
-| `pnpm test:e2e`           | Build and run actual Electron workflows                                    |
-| `pnpm validate:examples`  | Validate and solve the checked-in sample                                   |
-| `pnpm stress`             | Measure the 1,000-location scale fixture                                   |
-| `pnpm build`              | Build the main process, isolated preload, and renderer into `out/`         |
-| `pnpm package`            | Produce an unpacked desktop application                                    |
-| `pnpm package:win`        | Produce unsigned Windows NSIS and portable artifacts in `release/`         |
-| `pnpm eval:parser`        | Explain the optional live parser evaluation; makes no requests             |
-| `pnpm eval:parser --live` | Run billable parser evaluations with `OPENAI_API_KEY` set                  |
-| `pnpm format`             | Format source and documentation                                            |
+## Commands
 
-TypeScript is pinned to 6.0.3 because the installed typescript-eslint version does not support the TypeScript 7 compiler API. Runtime dependencies are pinned and the pnpm lockfile is included with the source.
+Try: look; take key; unlock drawer with key; put photograph in case; put book on desk; ask caretaker about photograph; say "hello" to caretaker; north.
 
-## OpenAI parsing
+Use THEN or semicolons for sequences. Lists, ALL, exclusions and quantities are supported. Ambiguous requests ask a question. HELP, COMMANDS, SAVE, RESTORE, UNDO, REDO, RESTART, AGAIN and CANCEL are system commands.
 
-Open **Settings**, enter your own API key, choose a model, save preferences, and test the connection. The initial adapter model is `gpt-4.1-mini`; the model ID is configurable. API usage is charged to your provider account. No API key is needed to author, playtest, save, export, or use conventional commands.
+## Project and game files
 
-The host uses Electron's OS-backed `safeStorage` when available. If protected storage is unavailable, credentials remain in memory. Model requests include the command, relevant player-visible context, and public action definitions. Read [the parser boundary and privacy details](docs/openai-parser.md).
+Save .elsewhen.json source projects for authoring. Export .elsegame packages for offline players; they open with the ElseWhen application. Progress files use .elsesave. Version-one projects migrate on a copy and require Save As. Review migration notices in Vocabulary. Old portable saves require the old application; version-two saves require the exact compiled game revision.
 
-## Explore the sample
+## Development
 
-Choose **Explore the sample**, then **Playtest**. Useful first commands are `look`, `take lantern`, `go stone arch`, and `examine shard`. The [complete walkthrough](docs/sample-walkthrough.md) is also stored as an executable scenario in `examples/the-folded-horizon/tests/scenarios.json`.
-
-Use **Story tests** in the explorer to run the sample's complete solution without modifying an active playtest. During playtest, the inspector exposes actual rule checks and committed state changes. **Game view** hides the debugger and presents the player's inventory and discovered-world map.
+| Command                | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| pnpm dev               | Run the desktop studio                                    |
+| pnpm typecheck         | Check application and shared types                        |
+| pnpm lint              | Run ESLint                                                |
+| pnpm test              | Run local parser, engine, migration and persistence tests |
+| pnpm test:e2e          | Build and test real Electron workflows                    |
+| pnpm generate:example  | Regenerate both sample projects                           |
+| pnpm validate:examples | Validate and play both sample scenarios                   |
+| pnpm stress            | Exercise the large-world fixture                          |
+| pnpm build             | Build the host, preload and renderer                      |
+| pnpm package:win       | Create Windows installer and portable builds              |
 
 ## Documentation
 
-- [Architecture and data ownership](docs/architecture.md)
-- [Project, package, and save formats](docs/project-format.md)
-- [Engine semantics](docs/engine-semantics.md)
 - [Authoring guide](docs/authoring-guide.md)
-- [OpenAI parser](docs/openai-parser.md)
+- [Command reference](docs/command-reference.md)
+- [Engine semantics](docs/engine-semantics.md)
+- [Architecture](docs/architecture.md)
+- [Formats and migration](docs/project-format.md)
 - [Sample walkthrough](docs/sample-walkthrough.md)
-- [Implementation status and verification](docs/implementation-status.md)
+- [Verification and compatibility notes](docs/implementation-status.md)
 
-This is a development release. See the status document for the exact verified scope and remaining first-release requirements. Distribution is unsigned. Signing, license selection, and public release publication are separate owner decisions.
+Windows artifacts are unsigned development builds. macOS and Linux packaging configurations require validation on their respective platforms.

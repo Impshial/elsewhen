@@ -3176,3 +3176,77 @@ a {
   background: var(--panel);
   border-radius: 6px;
 }
+
+.detached-player {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.detached-player .player-workspace {
+  flex: 1;
+  min-height: 0;
+}
+.detached-placeholder {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 18px;
+  padding: 40px;
+}
+
+.word-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.word-chips input {
+  min-width: 140px;
+  flex: 1;
+  border: 0;
+}
+.word-chip,
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-soft);
+  padding: 5px 9px;
+  border-radius: 5px;
+}
+.word-chip button {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.form-production {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 0;
+}
+.form-production input {
+  max-width: 220px;
+}
+.action-forms {
+  padding: 18px 0;
+}
+.try-result {
+  white-space: pre-wrap;
+}
+.vocabulary-editor ul {
+  padding-left: 24px;
+  line-height: 1.8;
+}
+.migration-item {
+  border: 1px solid var(--border);
+  padding: 12px;
+  margin: 8px 0;
+}

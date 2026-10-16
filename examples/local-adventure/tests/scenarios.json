@@ -1,0 +1,30 @@
+{
+  "format": "elsewhen-scenarios",
+  "scenarios": [
+    {
+      "assertions": [
+        {
+          "kind": "variable",
+          "ref": "rang",
+          "step": 8,
+          "value": true
+        }
+      ],
+      "commands": [
+        "take key",
+        "unlock drawer with key",
+        "open drawer",
+        "take photograph from drawer",
+        "unlock door with key",
+        "north",
+        "show photograph to caretaker",
+        "ask caretaker about photograph",
+        "ring bell"
+      ],
+      "ending": "",
+      "id": "courtyard-walkthrough",
+      "name": "Open the courtyard"
+    }
+  ],
+  "schemaVersion": 2
+}

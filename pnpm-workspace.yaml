@@ -6,5 +6,3 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - '@react-three/fiber@9.8.2'
-  - openai@7.34.0
-

@@ -1,6 +1,6 @@
 {
   "name": "elsewhen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A desktop studio for impossible worlds and interactive fiction",
   "author": "Impshial",
@@ -21,7 +21,6 @@
     "package": "pnpm build && electron-builder --dir",
     "package:win": "pnpm build && electron-builder --win nsis portable",
     "validate:examples": "tsx scripts/validate-examples.ts",
-    "eval:parser": "tsx scripts/eval-parser.ts",
     "stress": "tsx scripts/stress.ts",
     "generate:example": "tsx scripts/generate-example.ts",
     "format": "prettier --write .",
@@ -32,7 +31,6 @@
     "@react-three/fiber": "9.8.2",
     "fflate": "0.8.3",
     "lucide-react": "1.57.0",
-    "openai": "7.34.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "three": "0.186.1",

@@ -1,16 +1,15 @@
+import { runScenario } from './scenarios';
 import {
   scenariosSchema,
   scenarioSchema,
   type Scenario,
-  type ScenarioResult,
 } from '../../../../packages/domain/src/scenarios';
 import { walkthrough } from '../../../../examples/the-folded-horizon/sample';
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen } from 'electron';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import OpenAI from 'openai';
 import {
   blankProject,
   projectSchema,
@@ -27,8 +26,6 @@ import {
   readLimited,
   migrateProject,
 } from '../../../../packages/persistence/src/index';
-import { OpenAIParser, DEFAULT_MODEL } from '../../../../packages/parser/src/openai';
-import { buildContext } from '../../../../packages/parser/src/index';
 import { foldedHorizon } from '../../../../examples/the-folded-horizon/sample';
 import { Session } from './session';
 import type { Boot, Settings } from '../shared';
@@ -39,17 +36,95 @@ let window: BrowserWindow,
   project = foldedHorizon(),
   recent: string[] = [],
   drafts: { id: string; title: string }[] = [],
-  key = '',
-  config = { model: DEFAULT_MODEL, enabled: false, timeout: 30 };
+  config: Settings = { showCommandHints: true };
+let unrelatedPreferences: Record<string, unknown> = {};
+let playerWindow: BrowserWindow | null = null;
+const presentationSchema = z
+  .object({
+    input: z.string().max(8000),
+    history: z.array(z.string().max(8000)).max(1000),
+    historyIndex: z.number().int(),
+    selected: z.string(),
+    inventoryId: z.string(),
+    fontSize: z.number().min(15).max(26),
+    follow: z.boolean(),
+    search: z.string().max(8000),
+    scrollTop: z.number().nonnegative(),
+  })
+  .strict();
+function broadcastSession() {
+  if (session) session.showCommandHints = config.showCommandHints;
+  if (window && !window.isDestroyed())
+    window.webContents.send('elsewhen:session', session?.view() ?? null);
+  if (playerWindow && !playerWindow.isDestroyed())
+    playerWindow.webContents.send('elsewhen:session', session?.view(false) ?? null);
+}
+async function detachPlayer() {
+  const s = needSession();
+  if (s.busy) throw new Error('Wait for the current action to finish.');
+  s.detached = true;
+  if (playerWindow && !playerWindow.isDestroyed()) {
+    playerWindow.show();
+    playerWindow.focus();
+    return;
+  }
+  const saved = z
+    .object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
+    .safeParse(unrelatedPreferences.playerBounds);
+  const area = screen.getDisplayMatching(
+    saved.success ? saved.data : screen.getPrimaryDisplay().workArea,
+  ).workArea;
+  const width = Math.min(area.width, Math.max(900, saved.success ? saved.data.width : 1200)),
+    height = Math.min(area.height, Math.max(650, saved.success ? saved.data.height : 850));
+  const x = Math.max(
+      area.x,
+      Math.min(saved.success ? saved.data.x : area.x + 40, area.x + area.width - width),
+    ),
+    y = Math.max(
+      area.y,
+      Math.min(saved.success ? saved.data.y : area.y + 40, area.y + area.height - height),
+    );
+  const player = new BrowserWindow({
+    x,
+    y,
+    width,
+    height,
+    minWidth: Math.min(800, area.width),
+    minHeight: Math.min(600, area.height),
+    title: 'Game Player — ' + s.game.project.title,
+    backgroundColor: '#11191f',
+    show: false,
+    webPreferences: {
+      preload: path.join(dirname, '../preload/index.cjs'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  playerWindow = player;
+  player.setMenu(null);
+  player.on('page-title-updated', (event) => event.preventDefault());
+  player.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  player.webContents.on('will-navigate', (event) => event.preventDefault());
+  player.on('close', () => {
+    if (session) session.detached = false;
+    unrelatedPreferences.playerBounds = player.getNormalBounds();
+    void saveConfig().catch(() => {});
+    broadcastSession();
+  });
+  player.on('closed', () => {
+    if (playerWindow === player) playerWindow = null;
+  });
+  if (process.env.ELECTRON_RENDERER_URL)
+    await player.loadURL(process.env.ELECTRON_RENDERER_URL + '?player=1');
+  else
+    await player.loadFile(path.join(dirname, '../renderer/index.html'), { query: { player: '1' } });
+  player.show();
+  player.focus();
+}
 const dataPath = () => app.getPath('userData');
-const protectedStore = () =>
-  safeStorage.isEncryptionAvailable() &&
-  (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text');
-const settings = (): Settings => ({
-  ...config,
-  hasKey: !!key,
-  storage: protectedStore() ? 'protected' : 'session',
-});
+const settings = (): Settings => ({ ...config });
 const boot = (): Boot => ({
   project,
   path: files.current,
@@ -65,6 +140,7 @@ let scenarios: Scenario[] = [
     name: 'Find the way home',
     commands: walkthrough,
     ending: 'homeward',
+    assertions: [],
   },
 ];
 const scenarioFile = () =>
@@ -76,13 +152,20 @@ const needSession = () => {
   return session;
 };
 const endSession = () => {
+  playerWindow?.close();
   session?.cancel();
   session = null;
 };
 const saveConfig = () =>
   atomicWrite(
     path.join(dataPath(), 'settings.json'),
-    stableStringify({ format: 'elsewhen-settings', schemaVersion: 1, ...config, recent }),
+    stableStringify({
+      format: 'elsewhen-settings',
+      schemaVersion: 2,
+      ...unrelatedPreferences,
+      ...config,
+      recent,
+    }),
   );
 async function addRecent(file: string) {
   recent = [file, ...recent.filter((f) => f !== file)].slice(0, 10);
@@ -90,7 +173,7 @@ async function addRecent(file: string) {
 }
 async function chooseSave(title: string, extension: string, defaultPath?: string) {
   return (
-    await dialog.showSaveDialog(window, {
+    await dialog.showSaveDialog(BrowserWindow.getFocusedWindow() ?? window, {
       title,
       defaultPath: defaultPath ?? path.join(app.getPath('documents'), `Untitled.${extension}`),
       filters: [{ name: 'ElseWhen', extensions: [extension] }],
@@ -99,39 +182,36 @@ async function chooseSave(title: string, extension: string, defaultPath?: string
 }
 async function chooseOpen(title: string, extensions: string[]) {
   return (
-    await dialog.showOpenDialog(window, {
+    await dialog.showOpenDialog(BrowserWindow.getFocusedWindow() ?? window, {
       title,
       properties: ['openFile'],
       filters: [{ name: 'ElseWhen', extensions }],
     })
   ).filePaths[0];
 }
-function aiParser() {
-  if (!key)
-    throw new Error('No API key is configured. Add one in Settings or use conventional commands.');
-  return new OpenAIParser(
-    new OpenAI({ apiKey: key, timeout: config.timeout * 1000, maxRetries: 0 }),
-    config.model,
-  );
-}
 function safeError(error: unknown): string {
-  if (error instanceof OpenAI.APIError) {
-    if (error.status === 401) return 'OpenAI rejected this API key. Replace it in Settings.';
-    if (error.status === 429)
-      return 'OpenAI rate or usage limit reached. Try later or use conventional commands.';
-    if (error.status === 404 || error.status === 400)
-      return 'This model or structured-output request is not supported. Check the model in Settings.';
-    return 'The OpenAI service could not complete the request. You can use conventional commands.';
-  }
-  if (error instanceof Error) {
-    if (/abort|timeout/i.test(error.message))
-      return 'Interpretation cancelled or timed out. No action was committed.';
-    return error.message;
-  }
-  return 'The operation failed.';
+  return error instanceof Error ? error.message : 'The operation failed.';
 }
 async function invoke(method: string, raw: unknown): Promise<unknown> {
   switch (method) {
+    case 'playerBoot':
+      return needSession().view(false);
+    case 'playerPresentation':
+      needSession().presentation = presentationSchema.parse(raw);
+      return null;
+    case 'focusPlayer':
+      playerWindow?.show();
+      playerWindow?.focus();
+      return null;
+    case 'detachPlayer':
+      needSession().presentation = presentationSchema.parse(raw);
+      await detachPlayer();
+      return needSession().view();
+    case 'returnPlayer':
+      needSession().presentation = presentationSchema.parse(raw);
+      playerWindow?.close();
+      needSession().detached = false;
+      return needSession().view();
     case 'boot':
       return boot();
     case 'recoverDraft': {
@@ -156,36 +236,16 @@ async function invoke(method: string, raw: unknown): Promise<unknown> {
       scenarios = z.array(scenarioSchema).max(100).parse(raw);
       await atomicWrite(
         scenarioFile(),
-        stableStringify({ format: 'elsewhen-scenarios', schemaVersion: 1, scenarios }),
+        stableStringify({ format: 'elsewhen-scenarios', schemaVersion: 2, scenarios }),
       );
       return null;
     }
     case 'runScenario': {
       const args = z
-          .object({ project: projectSchema, scenario: scenarioSchema })
-          .strict()
-          .parse(raw),
-        test = new Session(compile(args.project), true),
-        result: ScenarioResult = { passed: true, steps: [], ending: null, turn: 0 };
-      for (const command of args.scenario.commands) {
-        await test.command(command);
-        const passed =
-          !!test.last?.success && !test.pending && test.transcript.at(-1)?.kind !== 'status';
-        result.steps.push({
-          command,
-          passed,
-          output: test.last?.output ?? [],
-          error: test.last?.error,
-        });
-        if (!passed) {
-          result.passed = false;
-          break;
-        }
-      }
-      result.ending = test.state.ending;
-      result.turn = test.state.turn;
-      if (args.scenario.ending && result.ending !== args.scenario.ending) result.passed = false;
-      return result;
+        .object({ project: projectSchema, scenario: scenarioSchema })
+        .strict()
+        .parse(raw);
+      return runScenario(args.project, args.scenario);
     }
     case 'debug': {
       const args = z
@@ -242,6 +302,7 @@ async function invoke(method: string, raw: unknown): Promise<unknown> {
               name: 'Find the way home',
               commands: walkthrough,
               ending: 'homeward',
+              assertions: [],
             },
           ]
         : [];
@@ -350,7 +411,18 @@ async function invoke(method: string, raw: unknown): Promise<unknown> {
     }
     case 'command': {
       const command = z.string().min(1).max(8000).parse(raw);
-      return needSession().command(command, config.enabled && key ? aiParser() : undefined);
+      if (['save', 'restore', 'load', 'restart'].includes(command.trim().toLowerCase())) {
+        await invoke(
+          command.trim().toLowerCase() === 'save'
+            ? 'saveGame'
+            : command.trim().toLowerCase() === 'restart'
+              ? 'restart'
+              : 'loadGame',
+          null,
+        );
+        return needSession().view();
+      }
+      return needSession().command(command);
     }
     case 'cancel':
       session?.cancel();
@@ -368,24 +440,33 @@ async function invoke(method: string, raw: unknown): Promise<unknown> {
       const old = needSession();
       old.cancel();
       session = new Session(old.game, old.debug);
+      session.detached = old.detached;
+      session.presentation = { ...old.presentation, input: '' };
       return session.view();
     }
     case 'saveGame': {
       const s = needSession(),
+        snapshot = s.save(),
         file = await chooseSave(
           'Save game',
           'elsesave',
           path.join(dataPath(), 'saves', `${s.game.project.title}-turn-${s.state.turn}.elsesave`),
         );
       if (!file) return null;
-      await atomicWrite(file, stableStringify(s.save()));
+      await atomicWrite(file, stableStringify(snapshot));
       return file;
     }
     case 'loadGame': {
+      const s = needSession(),
+        revision = s.revision;
       const file = await chooseOpen('Load saved game', ['elsesave']);
       if (!file) return null;
-      const s = needSession();
-      return s.restore(JSON.parse((await readLimited(file)).toString()));
+      const raw = JSON.parse((await readLimited(file)).toString());
+      if (session !== s || s.revision !== revision)
+        throw new Error(
+          'The play session changed while choosing a save. Restore again in the current session.',
+        );
+      return s.restore(raw);
     }
     case 'exportTranscript': {
       const s = needSession(),
@@ -400,42 +481,9 @@ async function invoke(method: string, raw: unknown): Promise<unknown> {
     case 'settings':
       return settings();
     case 'updateSettings': {
-      const args = z
-        .object({
-          model: z.string().min(1).max(100),
-          enabled: z.boolean(),
-          timeout: z.number().int().min(5).max(120),
-          key: z.string().max(500).optional(),
-          removeKey: z.boolean().optional(),
-          remember: z.boolean().optional(),
-        })
-        .strict()
-        .parse(raw);
-      config = { model: args.model, enabled: args.enabled, timeout: args.timeout };
-      if (args.removeKey) {
-        key = '';
-        await fs.rm(path.join(dataPath(), 'credential.bin'), { force: true });
-      } else if (args.key) {
-        key = args.key;
-        if (args.remember && protectedStore())
-          await atomicWrite(
-            path.join(dataPath(), 'credential.bin'),
-            safeStorage.encryptString(key),
-          );
-        else await fs.rm(path.join(dataPath(), 'credential.bin'), { force: true });
-      }
+      config = z.object({ showCommandHints: z.boolean() }).strict().parse(raw);
       await saveConfig();
       return settings();
-    }
-    case 'testConnection': {
-      const test = new Session(compile(blankProject()), false),
-        ctx = buildContext(test.view().view),
-        result = await aiParser().parse('Look around', ctx);
-      if (result.result.kind !== 'intent' || result.result.actionId !== 'look')
-        throw new Error(
-          'The provider responded, but the parser test did not return the expected action.',
-        );
-      return 'Connection verified. Structured interpretation returned “look”.';
     }
     default:
       throw new Error('Unknown host operation.');
@@ -522,9 +570,9 @@ async function createWindow() {
             click: () =>
               dialog.showMessageBox(window, {
                 title: 'ElseWhen',
-                message: 'ElseWhen 0.1.0',
+                message: `ElseWhen ${app.getVersion()}`,
                 detail:
-                  'A studio for impossible worlds.\nLocal authoring · deterministic play · optional OpenAI interpretation.',
+                  'A studio for impossible worlds.\nLocal authoring · deterministic English parser · offline play.',
               }),
           },
         ],
@@ -549,29 +597,71 @@ app.whenReady().then(async () => {
   drafts = await files.drafts();
   try {
     const raw = JSON.parse(await fs.readFile(path.join(dataPath(), 'settings.json'), 'utf8'));
-    config = z
-      .object({ model: z.string(), enabled: z.boolean(), timeout: z.number().min(5).max(120) })
-      .parse(raw);
-    recent = z.array(z.string()).parse(raw.recent);
+    recent = z.array(z.string()).catch([]).parse(raw.recent);
+    config = {
+      showCommandHints: typeof raw.showCommandHints === 'boolean' ? raw.showCommandHints : true,
+    };
+    const obsolete = new Set([
+      'model',
+      'enabled',
+      'timeout',
+      'key',
+      'apiKey',
+      'hasKey',
+      'storage',
+      'format',
+      'schemaVersion',
+      'recent',
+      'showCommandHints',
+    ]);
+    unrelatedPreferences = Object.fromEntries(
+      Object.entries(raw).filter(([key]) => !obsolete.has(key)),
+    );
   } catch {
-    /* First run uses local parsing. */
+    /* New installations use local defaults. */
   }
-  try {
-    if (protectedStore())
-      key = safeStorage.decryptString(await fs.readFile(path.join(dataPath(), 'credential.bin')));
-  } catch {
-    /* An unavailable OS store is session-only. */
-  }
-  if (!app.isPackaged && process.env.OPENAI_API_KEY) key = process.env.OPENAI_API_KEY;
+  // Delete only this application's retired credential file; never read or decrypt it.
+  await fs.rm(path.join(dataPath(), 'credential.bin'), { force: true }).catch(() => {});
+  await saveConfig().catch(() => {});
   ipcMain.handle('elsewhen:invoke', async (event, method: unknown, payload: unknown) => {
-    if (
-      !window ||
-      event.sender !== window.webContents ||
-      event.senderFrame !== window.webContents.mainFrame
-    )
-      return { ok: false, error: 'Untrusted sender.' };
+    const fromPlayer =
+      !!playerWindow &&
+      event.sender === playerWindow.webContents &&
+      event.senderFrame === playerWindow.webContents.mainFrame;
+    const fromDesigner =
+      !!window &&
+      event.sender === window.webContents &&
+      event.senderFrame === window.webContents.mainFrame;
+    if (!fromPlayer && !fromDesigner) return { ok: false, error: 'Untrusted sender.' };
     try {
-      return { ok: true, value: await invoke(z.string().parse(method), payload) };
+      const operation = z.string().parse(method);
+      const playerMethods = new Set([
+        'playerBoot',
+        'playerPresentation',
+        'returnPlayer',
+        'command',
+        'travel',
+        'cancel',
+        'undo',
+        'redo',
+        'restart',
+        'saveGame',
+        'loadGame',
+        'exportTranscript',
+      ]);
+      if (fromPlayer && !playerMethods.has(operation))
+        throw new Error('This operation is available only in the designer.');
+      if (
+        fromDesigner &&
+        session?.detached &&
+        ['command', 'travel', 'cancel', 'undo', 'redo'].includes(operation)
+      )
+        throw new Error('Use the Game Player window, or return it to the designer first.');
+      let value = await invoke(operation, payload);
+      if (operation !== 'playerPresentation') broadcastSession();
+      if (fromPlayer && value && typeof value === 'object' && 'transcript' in value)
+        value = needSession().view(false);
+      return { ok: true, value };
     } catch (error) {
       return { ok: false, error: safeError(error) };
     }
@@ -586,7 +676,10 @@ app.whenReady().then(async () => {
   }
   await createWindow();
 });
-app.on('before-quit', () => {
-  session?.cancel();
-});
 app.on('window-all-closed', () => app.quit());
+app.on('before-quit', (event) => {
+  if (window && !window.isDestroyed()) {
+    event.preventDefault();
+    window.webContents.send('elsewhen:menu', 'confirmClose');
+  }
+});

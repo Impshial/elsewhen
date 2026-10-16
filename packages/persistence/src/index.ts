@@ -10,28 +10,20 @@ import {
   type TranscriptEntry,
   scalar,
   placementSchema,
+  actionCatalog,
 } from '../../domain/src/index';
 import { compile, contentHash, type CompiledGame } from '../../compiler/src/index';
 import { assertState } from '../../engine/src/index';
+import {
+  discourseSchema,
+  clarificationSchema,
+  type Discourse,
+  type Clarification,
+  type ParsedCommand,
+} from '../../domain/src/conversation';
 export const MAX_FILE = 25 * 1024 * 1024;
-export function migrateProject(raw: unknown): Project {
-  if (!raw || typeof raw !== 'object') throw new Error('This is not an ElseWhen project.');
-  const data = structuredClone(raw) as Record<string, unknown>;
-  if (typeof data.schemaVersion === 'number' && data.schemaVersion > 1)
-    throw new Error(
-      `This project uses schema ${data.schemaVersion}. This version of ElseWhen supports schema 1. The original file has not been changed.`,
-    );
-  // Version 0 was the prototype format; migration always operates on a copy.
-  if (data.schemaVersion === 0) {
-    data.schemaVersion = 1;
-    data.format = 'elsewhen-project';
-    if (data.name && !data.title) {
-      data.title = data.name;
-      delete data.name;
-    }
-  }
-  return projectSchema.parse(data);
-}
+import { migrateProject } from '../../domain/src/migration';
+export { migrateProject } from '../../domain/src/migration';
 export async function readLimited(file: string): Promise<Buffer> {
   const stat = await fs.stat(file);
   if (stat.size > MAX_FILE) throw new Error('File exceeds the 25 MB limit.');
@@ -59,14 +51,21 @@ export class ProjectFiles {
   fingerprint: string | null = null;
   readOnly = false;
   private lockPath: string | null = null;
+  private upgradedSource: string | null = null;
   constructor(readonly recoveryDir: string) {}
   async inspect(file: string) {
     const bytes = await readLimited(file),
-      project = migrateProject(JSON.parse(bytes.toString('utf8')));
-    return { project, hash: contentHash(bytes.toString('utf8')) };
+      raw = JSON.parse(bytes.toString('utf8')),
+      project = migrateProject(raw);
+    return {
+      project,
+      hash: contentHash(bytes.toString('utf8')),
+      upgraded: raw.schemaVersion !== 2,
+    };
   }
   async open(file: string, mode: 'normal' | 'readonly' | 'takeover' = 'normal') {
-    const { project, hash } = await this.inspect(file);
+    const { project, hash, upgraded } = await this.inspect(file);
+    this.upgradedSource = upgraded ? file : null;
     await this.release();
     this.current = file;
     this.fingerprint = hash;
@@ -89,6 +88,8 @@ export class ProjectFiles {
   }
   async save(p: Project, file = this.current) {
     if (!file) throw new Error('Choose a project filename first.');
+    if (file === this.upgradedSource)
+      throw new Error('This project was upgraded. Use Save As to preserve the original version.');
     if (this.readOnly && file === this.current)
       throw new Error('This project is read-only. Use Save As.');
     if (file === this.current && this.fingerprint) {
@@ -154,7 +155,7 @@ export class ProjectFiles {
       this.recoveryPath(p.id),
       stableStringify({
         format: 'elsewhen-recovery',
-        schemaVersion: 1,
+        schemaVersion: 2,
         source: this.current,
         project: p,
       }),
@@ -194,8 +195,8 @@ export function exportGame(p: Project): Uint8Array {
   const game = compile(p),
     manifest = {
       format: 'elsegame',
-      schemaVersion: 1,
-      runtimeVersion: 1,
+      schemaVersion: 2,
+      runtimeVersion: 2,
       gameId: p.id,
       version: p.version,
       title: p.title,
@@ -267,8 +268,8 @@ export function importGame(bytes: Uint8Array): CompiledGame {
   const manifest = z
     .object({
       format: z.literal('elsegame'),
-      schemaVersion: z.literal(1),
-      runtimeVersion: z.literal(1),
+      schemaVersion: z.literal(2),
+      runtimeVersion: z.literal(2),
       gameId: z.string(),
       version: z.string(),
       title: z.string(),
@@ -277,7 +278,7 @@ export function importGame(bytes: Uint8Array): CompiledGame {
     .strict()
     .parse(JSON.parse(strFromU8(entries['manifest.json'])));
   const raw = JSON.parse(strFromU8(entries['game.json']));
-  if (raw.format !== 'elsewhen-runtime' || raw.schemaVersion !== 1 || raw.runtimeVersion !== 1)
+  if (raw.format !== 'elsewhen-runtime' || raw.schemaVersion !== 2 || raw.runtimeVersion !== 2)
     throw new Error('Unsupported runtime package.');
   const game = compile(projectSchema.parse(raw.project));
   if (
@@ -296,6 +297,13 @@ const observation = z
     kind: z.enum(['object', 'character', 'location', 'connection', 'topic']),
     description: z.string(),
     capabilities: z.array(z.string()),
+    nouns: z.array(z.string()).optional(),
+    adjectives: z.array(z.string()).optional(),
+    plurals: z.array(z.string()).optional(),
+    pronouns: z.array(z.string()).optional(),
+    direction: z.string().optional(),
+    destination: z.string().optional(),
+    doorId: z.string().optional(),
   })
   .strict();
 const stateSchema = z
@@ -317,6 +325,10 @@ const stateSchema = z
         .strict(),
     ),
     characters: z.record(z.string(), z.string()),
+    characterProperties: z.record(z.string(), z.record(z.string(), scalar)),
+    playerPlacement: placementSchema,
+    consumed: z.array(z.string()),
+    eventSequence: z.number().int().nonnegative(),
     variables: z.record(z.string(), scalar),
     connections: z.record(
       z.string(),
@@ -329,7 +341,13 @@ const stateSchema = z
     fired: z.array(z.string()),
     events: z.array(
       z
-        .object({ id: z.string(), due: z.number().int(), bindings: z.record(z.string(), scalar) })
+        .object({
+          id: z.string(),
+          instanceId: z.string(),
+          sequence: z.number().int(),
+          due: z.number().int(),
+          bindings: z.record(z.string(), scalar),
+        })
         .strict(),
     ),
     turn: z.number().int().nonnegative(),
@@ -339,18 +357,24 @@ const stateSchema = z
   .strict();
 export type SaveData = {
   format: 'elsesave';
-  schemaVersion: 1;
+  schemaVersion: 2;
   gameId: string;
   hash: string;
   state: GameState;
   transcript: TranscriptEntry[];
-  referents: string[];
+  discourse: Discourse;
+  pending: Clarification | null;
+  remainder: string[];
 };
 export function readSave(raw: unknown, game: CompiledGame): SaveData {
+  if (!raw || typeof raw !== 'object' || (raw as { schemaVersion?: number }).schemaVersion !== 2)
+    throw new Error(
+      'Unsupported save version. Use the original app for version 1 saves, or restart this game.',
+    );
   const save = z
     .object({
       format: z.literal('elsesave'),
-      schemaVersion: z.literal(1),
+      schemaVersion: z.literal(2),
       gameId: z.string(),
       hash: z.string(),
       state: stateSchema,
@@ -359,7 +383,9 @@ export function readSave(raw: unknown, game: CompiledGame): SaveData {
           z.object({ kind: z.enum(['command', 'narration', 'status']), text: z.string() }).strict(),
         )
         .max(100000),
-      referents: z.array(z.string()).max(100),
+      discourse: discourseSchema,
+      pending: clarificationSchema.nullable(),
+      remainder: z.array(z.string().max(8000)).max(32),
     })
     .strict()
     .parse(raw);
@@ -368,5 +394,125 @@ export function readSave(raw: unknown, game: CompiledGame): SaveData {
       'SAVE_MISMATCH: This save requires the exact game revision it was created with. Open the matching .elsegame package or restart.',
     );
   assertState(game.project, save.state);
+  const entityIds = new Set(
+    [
+      ...game.project.locations,
+      ...game.project.objects,
+      ...game.project.characters,
+      ...game.project.connections,
+      ...game.project.characters.flatMap((c) => c.topics),
+    ].map((e) => e.id),
+  );
+  const actionIds = new Set(game.grammar.map((g) => g.actionId));
+  const requireIds = (ids: string[], allowed: Set<string>) => {
+    if (ids.some((id) => !allowed.has(id)))
+      throw new Error('The save contains a reference outside this game.');
+  };
+  const objects = new Set(game.project.objects.map((e) => e.id)),
+    characters = new Set(game.project.characters.map((e) => e.id)),
+    locations = new Set(game.project.locations.map((e) => e.id)),
+    connections = new Set(game.project.connections.map((e) => e.id)),
+    topics = new Set(game.project.characters.flatMap((e) => e.topics.map((t) => t.id)));
+  requireIds(Object.keys(save.state.objects), objects);
+  requireIds(Object.keys(save.state.characters), characters);
+  requireIds(Object.keys(save.state.characterProperties), characters);
+  requireIds(Object.keys(save.state.placements), new Set([...objects, ...characters]));
+  requireIds(Object.keys(save.state.connections), connections);
+  requireIds(Object.keys(save.state.variables), new Set(game.project.variables.map((e) => e.id)));
+  requireIds(save.state.consumed, objects);
+  requireIds(save.state.visited, locations);
+  requireIds(save.state.forgottenTopics, topics);
+  requireIds(save.state.fired, new Set(game.project.rules.map((e) => e.id)));
+  if (save.state.previousLocation) requireIds([save.state.previousLocation], locations);
+  if (save.state.ending)
+    requireIds([save.state.ending], new Set(game.project.endings.map((e) => e.id)));
+  for (const [id, observation] of Object.entries(save.state.observations)) {
+    if (id !== observation.id) throw new Error('The saved observation identity is invalid.');
+    requireIds(
+      [id],
+      {
+        object: objects,
+        character: characters,
+        location: locations,
+        connection: connections,
+        topic: topics,
+      }[observation.kind],
+    );
+    if (observation.destination) requireIds([observation.destination], locations);
+    if (observation.doorId) requireIds([observation.doorId], objects);
+  }
+  const instances = new Set<string>();
+  for (const event of save.state.events) {
+    if (
+      instances.has(event.instanceId) ||
+      event.sequence < 1 ||
+      event.sequence > save.state.eventSequence ||
+      event.due < 0
+    )
+      throw new Error('The saved event ordering is invalid.');
+    instances.add(event.instanceId);
+  }
+  const actions = actionCatalog(game.project);
+  const validateBindings = (actionId: string, bindings: ParsedCommand['bindings']) => {
+    const action = actions.find((a) => a.id === actionId);
+    if (!action) throw new Error('The save references an unavailable action.');
+    for (const [key, value] of Object.entries(bindings)) {
+      const role = action.parameters.find((p) => p.id === key.split(':')[0]);
+      if (!role) throw new Error('The saved action has an unavailable role.');
+      if (['entity', 'connection', 'topic'].includes(role.kind)) {
+        const ids = Array.isArray(value) ? value : [value];
+        if (ids.some((id) => typeof id !== 'string'))
+          throw new Error('The saved action reference is invalid.');
+        requireIds(
+          ids as string[],
+          role.kind === 'connection'
+            ? connections
+            : role.kind === 'topic'
+              ? topics
+              : role.entityKind === 'object'
+                ? objects
+                : role.entityKind === 'character'
+                  ? characters
+                  : entityIds,
+        );
+      } else if (typeof value !== (role.kind === 'text' ? 'string' : role.kind))
+        throw new Error('The saved action value has the wrong type.');
+    }
+  };
+  if (save.discourse.repeat)
+    validateBindings(save.discourse.repeat.action.actionId, save.discourse.repeat.action.args);
+  for (const id of [
+    ...save.state.known,
+    ...save.state.visited,
+    ...Object.keys(save.state.observations),
+    ...save.discourse.plural,
+    ...[
+      save.discourse.object,
+      save.discourse.character,
+      save.discourse.recipient,
+      save.discourse.topic,
+    ].filter((s): s is string => s !== null),
+  ])
+    if (!entityIds.has(id)) throw new Error('The save contains a reference outside this game.');
+  if (save.pending) {
+    const validateCommand = (command: ParsedCommand) => {
+      const action = actions.find((a) => a.id === command.actionId);
+      const synthetic = command.actionId === 'go' && command.formId === 'direction';
+      if (!action?.forms.some((form) => form.id === command.formId) && !synthetic)
+        throw new Error('The saved question references an unavailable grammar form.');
+      if (Object.keys(command.phrases).some((key) => !action?.parameters.some((p) => p.id === key)))
+        throw new Error('The saved question references an unavailable phrase role.');
+      validateBindings(command.actionId, command.bindings);
+    };
+    validateCommand(save.pending.command);
+    if (save.pending.kind === 'interpretation')
+      for (const command of save.pending.alternatives) validateCommand(command);
+    if (!actionIds.has(save.pending.command.actionId))
+      throw new Error('The saved question references an unavailable action.');
+    if (save.pending.kind !== 'interpretation')
+      for (const c of save.pending.candidates)
+        if (!entityIds.has(c.id) || !save.state.known.includes(c.id))
+          throw new Error('The saved question contains an unavailable candidate.');
+  }
   return save;
 }

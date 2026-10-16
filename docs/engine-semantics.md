@@ -1,50 +1,43 @@
 # Engine semantics
 
-## Action pipeline
+## Actions and rules
 
-The engine accepts a compiled project snapshot, explicit state, and one canonical action. It validates identifiers, parameter types, public discovery membership, and role-specific scope before executing authored behavior. A transaction works on a clone and buffers all output.
+Every action validates its registered roles, entity identities and current scope. A draft transaction buffers state and output. Requirements are pure: Applies when selects whether a requirement governs the action; its condition must then pass. Check effects are rejected, with legacy effects retained in migration review records.
 
-1. Structural validation rejects malformed or undiscovered IDs without a turn.
-2. Scope checks establish whether each role is accessible, reachable, carried, visible, or merely known.
-3. Check rules run in descending priority, author order, then stable ID. A failed check returns its authored refusal.
-4. The first successful Handle rule runs. If none succeeds, the first matching Otherwise refusal is selected; otherwise the built-in operation runs.
-5. Successful actions run After rules against the evolving draft.
-6. Immediate leave/enter/named events drain in deterministic order.
-7. The turn cost is applied. Due events run, then turn-end events.
-8. Observations refresh, state invariants are checked, and state/output commit together.
+The first eligible Instead/Handle rule supplies an explicit success or refusal. Otherwise the standard operation runs. All matching After rules run in priority, author order and stable-ID order. Response rules can replace or append the standard report without replacing the operation. Immediate events drain in FIFO order after the operation.
 
-An internal exception rolls back state, RNG, output, event scheduling, and turn cost. An ordinary in-world refusal commits its configured turn cost and may trigger due events. Parser errors, ambiguity, cancellations, and unsupported commands are not world actions.
+Go opens an unlocked closed door through the same Open pipeline. The child consumes no extra turn, history checkpoint or event drain, and the door must actually be open afterward. A refused parent rolls back provisional child changes and output. Invoke action effects use this pipeline too; stop, report and ignore control an ordinary child refusal. Recursion shares the 100-unit transaction work budget.
 
-## Scope
+Internal failures roll back state, output, queued events, RNG and time. Ordinary refusals restore provisional action changes, then consume the configured refusal cost and process any resulting turn events.
 
-Existence, discovery, current visibility, reachability, and transitive carrying differ. A token in a closed opaque box is hidden. A transparent box exposes eligible contents but still blocks physical access. Carrying a closed box transitively carries its contents; accessible-tool roles still require an open containment chain.
+## Scope, containment and actors
 
-Opening a container reveals currently visible contents. Previously observed objects retain remembered public names/descriptions without receiving their remote live state. Darkness uses active visible light sources; opaque containment blocks illumination. Carried-item interaction and authored exits marked navigable in darkness remain available.
+Public identity, present visibility, reachability, direct possession and nested carrying differ. Closed transparent containers allow sight but block reach; opaque interiors also block light. Supported contents remain outside the closed interior. Scenery can emit light without appearing in ordinary item listings.
 
-Visiting reveals a location. Observing an exit records its label; its unvisited destination stays anonymous unless the author explicitly reveals it. A known exit can still be attempted when a visibility condition changes. Enabled state and traversal conditions determine actual permission.
+Objects and actors use containment ancestry with cycle checks. Player occupancy tracks inside/on separately from the effective room. Enter requires capacity and access. Ordinary Go requires leaving the enclosure first. Moving an occupied enclosure preserves its occupants and updates effective rooms. OUT leaves current occupancy before attempting an outward connection.
 
-## Built-ins and turns
+NPC possessions have visibility and taking-permission settings. Give transfers possession if accepted; Show does not. Character property changes use runtime state. Consumables move offstage and retain their source definitions, making consumption undoable.
 
-Look, examine, inventory, and read cost zero turns. Movement, manipulation, conversation, use, and wait cost one by default. Custom actions declare their own cost. A recognized refusal consumes that cost unless the project makes failed attempts free.
+Known remote identities retain public vocabulary, but Examine and Read require current observation. Hidden, undiscovered entities do not enter candidate menus or quantifier selections.
 
-Shared doors have a single open/locked state visible from both endpoints. Moving through an unlocked closed door implicitly opens it inside the same transaction and records the subaction. Door keys are authored references. Built-ins never infer a puzzle solution from map layout.
+## Time
 
-Put operations check parent capabilities, open state, direct-item count capacity, and containment cycles. Moving a container preserves descendant placement. Worn objects remain carried.
+Look, Examine, Inventory, Read and Look in/under/behind are free. Search and other standard actions cost one turn; custom actions configure cost. Every consumed turn processes due instances followed by turn rules. Due order is due tick, rule priority and insertion sequence. Scheduled instances have stable IDs; cancellation can target an instance or definition.
 
-## Events and randomness
+Delay 1 is anchored after the scheduling action's resulting turn. Scheduling inside a turn/event drain is anchored to the current tick. An ending reached before turn advancement charges the action's cost without further dispatch; an ending during a tick stops remaining ticks. Zero-turn actions remain zero-turn.
 
-Delay 1 means one future consumed turn after the scheduling action's resulting turn. Read-only zero-turn observations do not advance scheduled events. Scheduling captures serializable argument bindings. Immediate events use a separate effect.
+Random effects use saved deterministic LCG state. The same game, seed, state and command sequence reproduce outcomes.
 
-Moving the player queues leave followed by enter, with `from` and `to` bindings. Events see the post-move draft. Use a Check rule to prevent departure.
+## Language, queues and history
 
-At most 100 event/effect/rule work units execute in one transaction. Exceeding the bound reports a diagnostic and rolls back instead of hanging. End-game effects must be last in a list, commit the action's normal cost, and stop further event dispatch.
+The lexer checks the entire input before execution. Limits are 8,000 characters, 2,048 tokens, 32 clauses, 128 grammatical alternatives, 20,000 grammar work steps and 100 bulk targets. Excess input fails explicitly.
 
-Random effects use the stored LCG state. The same initial seed and canonical action sequence reproduce logical state and authored output without calling OpenAI.
+Whole known names protect conjunctions and prepositions. Quoted phrases protect separators and support escaped quotes/backslashes. Free conversation text keeps AND as part of the topic; use THEN or a semicolon to follow it with another command. Every significant noun token must match; fuzzy execution is never performed.
 
-## History and sessions
+Each clause resolves against state after earlier clauses. Refusal stops later clauses without undoing previous successes. Questions suspend their remainder; an answer resumes it, while a new command or Cancel discards it. Bulk targets are resolved and frozen first. Ordinary per-item refusals continue through that bulk clause, then stop subsequent clauses.
 
-The host retains 100 checkpoints, including zero-turn observations. Undo and redo restore state, discovery, event schedule, RNG, referents, and transcript boundaries together. Redo uses stored results. New actions after undo clear the redo branch.
+Take all selects eligible reachable portable objects and does not separately empty a selected outer container. Drop all and Put all select directly held unworn objects. Exclusions resolve before execution. Quantities ask for a subset when more distinct candidates exist than requested.
 
-Command-input history is separate from world history. A semicolon queue is limited to eight commands and respects quoted semicolons. Each step uses fresh context. The queue stops on ambiguity, refusal, unsupported input, cancellation, or ending; remaining commands must be explicitly resubmitted.
+Discourse tracks object focus, explicitly configured character pronouns, plural groups, conversation and repeat selectors. Again repeats a single action; movement resolves its selector from the new room. Sequences and bulk requests are not repeatable.
 
-Cancellation increments a host epoch/revision and aborts the request. A late response cannot match the active session revision. Restart creates a fresh state and runs initial events once. Designer debug mutations are explicitly marked, undoable, and rejected in exported player sessions.
+The host retains 100 checkpoints. Undo cancels pending work before restoring the previous committed action; Redo restores recorded results without rerunning randomness. Portable saves include pending questions and queues but exclude undo/redo stacks. Restoring never automatically answers a question or executes its remainder.

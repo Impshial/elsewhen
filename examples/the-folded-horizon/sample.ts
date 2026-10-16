@@ -20,7 +20,7 @@ const passage = (
   to: string,
   reverseId = '',
   rest: Record<string, unknown> = {},
-) => ({ id, name, from, to, reverseId, ...rest });
+) => ({ id, name, from, to, reverseId, revealDestination: false, ...rest });
 export function foldedHorizon(): Project {
   return projectSchema.parse({
     id: 'world-folded-horizon',
@@ -288,26 +288,14 @@ export function foldedHorizon(): Project {
       },
       { id: 'var-horizon', name: 'Horizon open', type: 'boolean', initial: false },
     ],
-    actions: [
-      {
-        id: 'speak',
-        name: 'Speak',
-        aliases: ['say', 'speak'],
-        description: 'Speak supplied words to a reachable entity.',
-        parameters: [
-          { id: 'text', name: 'Words to speak', kind: 'text', scope: 'none' },
-          { id: 'target', name: 'Listener', kind: 'entity', scope: 'reachable' },
-        ],
-        examples: ['say "hello" to listener'],
-        refusal: 'Your words fade without an answer.',
-      },
-    ],
+    endings: [{ id: 'homeward', name: 'Homeward' }],
+    actions: [],
     rules: [
       {
         id: 'rule-activate',
         name: 'Activate wormhole',
         trigger: 'use',
-        bindings: { tool: 'obj-shard', target: 'obj-anchor' },
+        bindings: { item: 'obj-shard', target: 'obj-anchor' },
         priority: 10,
         condition: variable('var-wormhole', 'Dormant'),
         effects: [
@@ -324,7 +312,7 @@ export function foldedHorizon(): Project {
         id: 'rule-name',
         name: 'Speak the name',
         trigger: 'speak',
-        bindings: { target: 'obj-console' },
+        bindings: { recipient: 'obj-console' },
         condition: {
           kind: 'compare',
           source: 'argument',

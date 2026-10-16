@@ -1,0 +1,765 @@
+ELSEWHEN: LOCAL INTERACTIVE FICTION ENGINE AND NO-CODE AUTHORING REWRITE
+Implementation prompt for Codex
+
+1. THE JOB
+
+Rework ElseWhen into a complete, local, traditional parser-based interactive fiction system with a graphical, entirely no-code authoring environment.
+
+Remove AI from the application. Replace its language interpretation role with a substantial deterministic English parser, a built-in action library, and a consistent world model. Authors describe their worlds, configure objects, and create conditions and consequences through the interface. ElseWhen supplies the language machinery and ordinary adventure behavior.
+
+Substantial refactoring and schema changes are authorized. Implement this in the actual repository, including runtime, designer, migration, documentation, and tests. Work in coherent phases, but continue through implementation rather than stopping after a plan or a parser prototype. Do not call a feature complete when only its command recognition or UI exists.
+
+Keep the existing Electron, React, TypeScript, and package architecture unless a concrete technical need requires adjustment. Keep ElseWhen's established visual style and desktop workflows. The player retains the traditional transcript, command box, inventory panel, and rotatable 3D map, and can switch between an embedded view and its own separate native desktop window. The designer retains world editing and 2D/3D map tools.
+
+The intended scope is a capable traditional English IF engine, with extensible author-defined interactions. It is not an attempt to understand every English sentence or simulate arbitrary physics. A clear refusal or useful clarification is a valid outcome. Silent guesses, discarded words, and fabricated consequences are not.
+
+All authoring, compilation, play, tests, export, save, and restore must work offline. No model, account, API key, remote inference, local language model, or online service is involved.
+
+2. START WITH THE EXISTING SYSTEM
+
+Inspect the current repository before making changes. The reviewed version has these relevant areas:
+
+- packages/domain/src/index.ts: schemas, entities, capabilities, actions, conditions, effects, runtime state.
+- packages/parser/src/index.ts: conventional parser, context construction, resolution, clarification, command splitting.
+- packages/parser/src/openai.ts: AI transport and interpretation.
+- packages/engine/src/index.ts: action execution, rules, perception, containment, events, RNG, state validation.
+- packages/compiler/src/index.ts and validation.ts: validation, templates, runtime compilation.
+- packages/persistence/src/index.ts: projects, compiled packages, portable saves, migration.
+- apps/desktop/src/main/session.ts: commands, history, clarification, play session.
+- apps/desktop/src/main/index.ts, shared.ts, and preload/index.ts: settings and application/IPC integration.
+- apps/desktop/src/renderer/Editors.tsx, RuleEditor.tsx, TestsEditor.tsx, Player.tsx, App.tsx, WorldMap.tsx.
+- tests, examples/the-folded-horizon, and docs.
+
+Treat these as a source map, not an assumption that the current checkout is identical. Verify each affected behavior in the current code.
+
+Reuse sound foundations: stable IDs, declarative rules, transactional state changes, output buffering, discovery, containment, seeded randomness, bounded events, deterministic compilation, source recovery, portable saves, and undo/redo. Refactor their implementation where needed. Preserve the distinction between authored project data, compiled runtime data, mutable game state, player-visible information, and editor-only information.
+
+Specific issues found in the reviewed source must be addressed:
+
+- The conventional parser is mainly ordered patterns with permissive word matching. Extra unmatched words can be accepted.
+- Parser context uses AI-oriented truncation and lacks precise per-entity scope facts.
+- Directions and destination names are not properly connected to movement vocabulary.
+- Clarification can swallow a new command as an answer to the previous one.
+- Numeric clarification choices can be resolved through their display names again, breaking duplicate-name choices.
+- Pronouns use an undifferentiated recent-reference list.
+- Put-in and put-on lose their distinction before execution.
+- Implicit door opening changes state directly, bypassing Open rules.
+- Some grammar mentions an action such as speak without a matching built-in implementation.
+- Check-rule effects can be authored but ignored by execution.
+- Changing an action's response currently risks requiring replacement of the operation itself.
+- Character properties and NPC possessions lack consistent runtime support.
+- Custom-action authoring exposes parameter IDs and a pipe-separated command convention.
+- Descriptive examples do not constitute executable local grammar.
+- Template-dependent validation can happen before effective capabilities are resolved.
+- Multi-turn costs advance time without processing each turn consistently.
+
+3. REMOVE AI COMPLETELY
+
+Remove AI-specific production code, dependency entries, settings, IPC, prompts, transport schemas, provider factories, credential UI, model selectors, connection tests, token/cost displays, timeout settings, fallback messages, environment-key handling, and AI-only evaluation scripts.
+
+Remove the OpenAI dependency and regenerate the lockfile appropriately. Replace the billable parser evaluation workflow with local deterministic regression tests. Update active documentation, examples, help, and About text to describe the local engine. Historical migration notes may mention the old integration, but active behavior must not imply it is available.
+
+The reviewed desktop settings file mixes AI configuration with recent-project information. Migrate away AI fields while retaining recent projects and unrelated preferences. Remove only the obsolete app-owned credential.bin file from ElseWhen's application data, if present. Do not decrypt it, print it, alter environment variables, or touch unrelated credentials. Cleanup failure must not prevent offline play or produce sensitive output.
+
+Keep cancellation, session revision checks, and safe IPC concepts where they still serve local queues, asynchronous file operations, clarification, or playtest lifecycle. Remove their AI-specific branches instead of deleting useful session controls.
+
+Do not leave a disabled AI adapter or placeholder option in the shipping application.
+
+4. ARCHITECTURE AND OWNERSHIP
+
+Use a shared typed action boundary between parser and engine. All entry points, including typed commands, inventory context commands, and clickable map exits, ultimately invoke the same validated action pipeline.
+
+Implement these responsibilities as testable modules with clear types:
+
+A. Authoring domain
+   Serializable definitions for entities, vocabulary, grammar forms, capabilities, typed properties, conditions, effects, rules, events, and responses. Stable IDs remain internal.
+
+B. Compiler
+   Validate structure and references, resolve templates, validate effective behavior, compile vocabulary/grammar and runtime lookup data, strip private authoring content, and create a versioned immutable runtime definition.
+
+C. Lexer and grammar parser
+   Convert input into a structured command plan containing verbs, typed roles, noun phrases, relationships, quantities, exclusions, text, and sequence boundaries.
+
+D. Reference resolver
+   Bind names and references against the current player-facing scope and discourse state. Return resolved intent, clarification, or a structured diagnostic.
+
+E. Session controller
+   Manage pending questions, input history, command sequences, bulk targets, repeat commands, checkpoints, save/restore, and the boundary between interpretation and execution.
+
+F. World engine
+   Revalidate actions, enforce capabilities and authored rules, execute transactions, process events and turns, and produce authored/default reports.
+
+G. Shared world queries
+   Supply perception, knowledge, reachability, containment, ownership, light, and travel facts. The parser must use these queries instead of independently implementing different visibility rules.
+
+H. Designer diagnostics
+   Explain grammar selection, candidate resolution, rules, refusals, state changes, and turn cost. This diagnostic information is available in designer playtests, not exposed as hidden world knowledge in the exported player.
+
+Parsing and reference resolution must not mutate the world, consume turns, reveal secrets, run rules with effects, or draw random numbers. Execution is the only authority for game consequences.
+
+Keep logical behavior deterministic for a compiled game version, initial seed, session state, and input sequence. Do not use wall-clock time, unseeded randomness, object iteration accidents, or filesystem order to decide outcomes.
+
+5. LANGUAGE AND VOCABULARY
+
+Build a compiled vocabulary catalog rather than repeatedly scanning descriptions.
+
+Ship built-in English verb phrases, synonyms, abbreviations, directions, prepositions, pronouns, and command forms. Entity names automatically become vocabulary. Authors can add aliases, noun phrases, distinguishing adjectives, and plural forms using normal controls.
+
+Examples:
+
+- take, get, pick up, grab -> Take.
+- examine, inspect, look at, x -> Examine.
+- inventory, i -> Inventory.
+- look, l -> Look.
+- wait, z -> Wait.
+- put X in Y and insert X into Y -> Put inside.
+- put X on Y and place X onto Y -> Put on.
+- remove X from Y -> Take from.
+- remove X without a source -> Take off when X is worn; otherwise give a suitable clarification/refusal.
+- switch on X, turn X on, turn on X -> Switch on.
+
+Support multiword verbs and separable forms deliberately. Never replace words globally without considering grammar. For example, 'take off coat' must not become Take + an object called 'off coat'.
+
+Aliases are player vocabulary. Tags, location types, regions, notes, internal IDs, and map coordinates are not vocabulary unless an author explicitly adds a corresponding alias. Do not mine description text to create arbitrary noun matches.
+
+Match case-insensitively with consistent Unicode normalization. Preserve original display text and input spans. Handle ordinary whitespace, articles in noun phrases, apostrophes, and sentence-ending punctuation without destroying quoted text or significant names. Do not globally remove words such as 'in', 'on', 'and', or 'then'.
+
+Use authored plural forms and known lexical mappings. Do not assume removing a trailing s is a universal singularization algorithm. Support distinct objects sharing a plural noun such as coins. A stack/quantity simulation is not required; quantity commands may select separate represented objects.
+
+Every significant token must be consumed by a recognized grammar production or reported. 'Take brass key banana' must never execute Take Brass Key by ignoring banana.
+
+Optional polite wrappers such as 'please take the key' may be explicitly supported by grammar. Do not imply unrestricted conversational understanding.
+
+Spelling assistance may suggest public, in-scope vocabulary. It must not silently execute a fuzzy match or suggest undiscovered objects. Unknown vocabulary should produce useful examples of accepted forms.
+
+Remove the old AI context limits of 150 entities, 100 exits/topics, or a short truncated description window. Use indexes, appropriate scope sets, and explicit input/resource limits. No entity should silently lose vocabulary because the world is large.
+
+6. GRAMMAR AND COMMAND REPRESENTATION
+
+Use a grammar-aware parser capable of considering alternative splits when names contain reserved-looking words. A large collection of permissive regular expressions is not an adequate final architecture. A lexer plus bounded grammar matcher or comparable deterministic parser is acceptable; implementation machinery remains invisible to authors.
+
+Support these grammar families:
+
+- No argument: look; inventory; wait.
+- One target: examine locket; open drawer; read note.
+- Target and tool: unlock drawer with brass key; cut rope with knife.
+- Item and destination relation: put photograph in locket; put book on desk.
+- Item and source: take photograph from drawer.
+- Item and recipient: give photograph to caretaker; show key to caretaker.
+- Character and topic: ask caretaker about accident; tell caretaker about photograph.
+- Quoted speech: say "Meridian" to prism console.
+- Movement: north; ne; go north; go to courtyard; enter maintenance room; go through rusty door.
+- Explicit lists: take key and photograph; drop key, coin, and photograph.
+- Plural selection: take coins; take all coins; take two coins.
+- Exclusion: take all except brass key; drop all but lantern.
+- Sequences: open drawer then take photograph; open drawer; take photograph.
+
+Preserve semantic roles in typed internal data: item, target, instrument, destination, source, recipient, topic, text, direction, and relation. Do not call every item a tool or collapse inside/on/through/with into one generic field.
+
+Represent lists and sequences structurally. Do not pack arrays into strings or separate arguments with a player-visible pipe. Prefer discriminated unions and explicit validation over an unrestricted scalar argument bag.
+
+Keep stable built-in action IDs where practical. If roles or IDs change, migrate rule references, effects, bindings, tests, and compiled schema together.
+
+Text and topic arguments must preserve intended content. 'Ask Ada about north and south' is one topic. 'Say "wait; then go north" to caretaker' is one speech action. Support escaped quotes consistently and diagnose unclosed quotes before executing any part of the input.
+
+Entity names such as 'Man in Black', 'Salt and Pepper', and 'Then and Now' must work. Prefer a complete valid entity phrase over a blind split on a preposition or conjunction. Quoting a name provides an explicit escape hatch. If multiple grammatical interpretations remain equally valid, ask instead of choosing silently.
+
+Treat then and semicolons as explicit sequence syntax outside protected phrases. Interpret and as a noun-list separator when it joins nouns, or as a command separator when a complete next command is established. If the boundary is ambiguous, request clarification. Never split every and in advance.
+
+Every shipped grammar production must map to a registered action with complete validation, execution/refusal behavior, reporting, documentation, and tests.
+
+7. NOUN RESOLUTION AND SCOPE
+
+Distinguish these facts:
+
+- Entity exists in the world definition.
+- Player knows its public identity.
+- It is in the current scene or containment environment.
+- It is visible now.
+- It is physically reachable now.
+- It is directly held, indirectly carried, or worn.
+- It is owned/held by another actor and may require permission.
+- Its current state is observable or only remembered.
+
+Use lexical specificity first, followed by documented role and scope preferences among comparable matches. Exact names and aliases outrank loose partial phrases. Support discriminating noun/adjective combinations such as brass key, small brass key, and brass one in clarification.
+
+A local key can outrank an equally described remembered remote key for Take. An explicitly named remote brass key must not be replaced with a local iron key. Do not resolve ambiguity by guessing which target would make the puzzle succeed.
+
+Recognize an identified but impossible request. 'Take statue' should produce 'The statue is fixed in place' when appropriate, not an unknown-object error. A closed transparent case allows identifying its visible coin but prevents taking it. A remembered object elsewhere can receive an availability response without disclosing its unseen current location or state.
+
+Do not expose undiscovered concealed entities through candidate menus, number choices, suggestions, plural expansion, developer-like error messages, or all. A globally compiled noun index is not permission to name everything to the player.
+
+Use stable ordering for equally ranked candidates, but never use that ordering as permission to choose one silently. Candidate labels may include public distinguishing context, such as 'brass key on the table' and 'brass key in your hand'. Bind a numeric choice directly to its candidate ID.
+
+Directly naming a wrong-capability object should ordinarily yield an engine refusal. Use role types and capability restrictions to help interpretation and author validation without erasing the distinction between 'I do not know what you mean' and 'You cannot do that to this object'.
+
+Do not obtain live remote properties through Examine. For a remembered entity that is not presently observable, give an availability response or clearly labeled remembered information. Reading text requires the appropriate current visibility/light conditions.
+
+8. PRONOUNS, FOCUS, AND FOLLOW-UP QUESTIONS
+
+Replace the flat recent-reference array with structured discourse and session state. Keep persistent discourse separate from transient pending work so restoring an undo checkpoint cannot resurrect a canceled question:
+
+- Main singular object focus.
+- Character focus using explicitly configured pronouns; do not infer gender from names.
+- Plural referent group.
+- Relevant current conversational topic/recipient.
+- Last repeat record, including the semantic selector needed to repeat movement.
+- Separately: pending command, established bindings, unresolved role, candidate IDs, original input, and suspended remainder.
+
+Pending clarification is a discriminated union for missing-argument completion, entity selection, quantity/subset selection, and grammatical-interpretation selection. An interpretation question presents readable public alternatives and resumes the selected command structure without prematurely resolving its later clauses. A quantity question retains the required count and accepts replies such as '1 and 3' or 'brass coin and silver coin', validating the count and distinct IDs before executing anything.
+
+Use semantic salience. After 'unlock drawer with key', it normally means the drawer, not the key merely because the key was the last parameter processed. After 'take key and photograph', them refers to that selected group. Incidental nouns in generated room text must not replace deliberate player focus automatically.
+
+Unclear or stale pronouns produce clarification, not random selection. Revalidate remembered IDs against the current state. Undo and restore must restore the corresponding discourse state.
+
+Clarification is a continuation of the unfinished command:
+
+Player: unlock drawer
+Game: What do you want to unlock the drawer with?
+Player: brass key
+Game: You unlock the drawer.
+
+Ask for one missing role at a time. Retain already established roles. Do not automatically select a matching key by inspecting the world's keyId puzzle answer. Asking for a tool remains meaningful even when the engine knows which one works.
+
+Support replies by number, exact name, adjective, supported pronoun, or a unique distinguishing phrase. Invalid replies retain the question and consume no turn. Give numbered choices only when actual public candidates exist.
+
+A recognizable new world command replaces the pending one. In the example above, 'examine portrait' must examine the portrait. Dispatch system commands first: Save, Help, and Commands preserve the question and suspended remainder; Restore replaces them only on a successful load; Undo, Redo, Restart, and Cancel clear them. Again is a replacement request, not an answer to a missing noun. Provide cancel and never mind as explicit cancellation forms. Cancel clears the suspended command sequence too.
+
+Support 'the other one' only when a previous selection and a two-candidate context make it uniquely meaningful. Otherwise ask.
+
+World state can change through undo, restore, restart, debug edits, or lifecycle operations. Revalidate pending bindings rather than executing stale references. Undo/restart/debug mutation cancel pending work; restore follows the saved pending-state policy below.
+
+9. MULTIPLE OBJECTS AND COMMAND SEQUENCES
+
+These are separate concepts with separate execution policies.
+
+For a sequence, interpret each clause immediately before it executes, using the state resulting from the previous clause. 'Open drawer then take photograph' must find the photograph after opening the drawer. Do not resolve every future noun against the initial scene.
+
+Each explicit action is its own transaction. Earlier successful actions remain committed if a later clause fails. Stop the sequence on refusal, parse error, cancellation, ending, or internal error. On clarification, suspend the current clause and remaining clauses. Resume only after an explicit answer successfully completes the pending action. A replacement command or cancellation discards the suspended remainder.
+
+For a multi-object clause, resolve its explicit noun phrases and exclusions before changing anything. Do not take the first object and only then ask which second object was intended. Freeze and deduplicate the target IDs at the start of that clause. Do not add newly revealed objects halfway through an all operation.
+
+Each selected member runs the normal action pipeline, has its normal turn cost, and gets its own result and undo checkpoint. Continue through ordinary per-item refusals within a bulk clause, but stop for ending, cancellation, internal error, or an unexpected need for clarification. If any member refused, do not run subsequent then clauses automatically.
+
+Recheck each member's current scope immediately before execution. An earlier member's events may move or disable a later target. Do not roll back earlier committed members because a later target becomes unavailable.
+
+Default quantifier behavior:
+
+- Take all selects public, reachable, portable objects that are not already carried; excludes scenery, fixed objects, actors, and NPC possessions without permission.
+- When an outer portable container and its contents would all qualify for unqualified Take all, select the outer container without separately emptying it. 'Take all coins' may select qualifying accessible contents specifically.
+- Take all from drawer selects eligible direct contents of that source, subject to access. It does not include the drawer itself or hidden nested contents.
+- Drop all selects directly held, non-worn objects. It does not silently strip clothing or empty every nested container.
+- Put all in/on target uses eligible directly held, non-worn items, excluding the destination and any placement that would create a cycle.
+- Explicit lists are not silently filtered like all. 'Take statue and coin' reports the statue's refusal and then attempts the coin.
+- Exclusions use normal resolution. An ambiguous exclusion is resolved before any member executes.
+- A number such as two coins automatically selects only when exactly two eligible coins remain, or the command already identifies a unique two-object subset. Otherwise ask which two and accept a multi-choice reply. Do not select arbitrary distinct puzzle items by array order. A separate fungible-stack or interchangeability model is outside this scope.
+- An empty result produces a clear response with no turn cost.
+
+Use named, tested limits, initially 32 sequential clauses and 100 targets per bulk clause. Validate lexical structure and clause count before executing input; validate each bulk expansion before executing that clause. Reject excess input clearly rather than silently truncating it. Bound grammar alternatives, nesting, and total parser work as well.
+
+10. MOVEMENT, CONNECTIONS, AND THE MAP
+
+Connections define travel. Coordinates define map presentation. Never infer adjacency, direction, distance-based permission, or a reverse connection from where a node happens to be drawn.
+
+Support these canonical directions and abbreviations:
+
+North/n, northeast/ne, east/e, southeast/se, south/s, southwest/sw, west/w, northwest/nw, up/u, down/d, in, out. Accept clear full-name variants such as north-east through controlled normalization.
+
+A connection's Direction field must directly supply parser vocabulary. Authors must not add n and north as aliases manually. Keep the visible connection label, direction, endpoints, and aliases distinct.
+
+Connections remain directed. Creating a reciprocal pair can be a convenient authoring operation, with independently editable reverse direction and vocabulary. Do not assume every portal, ladder, doorway, or wormhole is reversible. Shared doors reference one object state from all associated connections.
+
+Recognize movement through:
+
+- Direction: ne.
+- Connection label or alias: go through archway.
+- Door: go through rusty door.
+- Adjacent destination's permitted name or alias: go to courtyard; enter maintenance room.
+
+An internal connection label such as WaitToCourt must not prevent 'go to courtyard' when its destination is publicly nameable.
+
+Destination naming has an explicit policy: a destination can be referenced if already known, or if the author chooses to reveal its name through this exit. Default new visible ordinary connections to revealing the destination name, with an obvious option to show only the exit label for mysterious passages. Concealed connections remain concealed. Migration preserves existing reveal choices and does not expose old secrets.
+
+The resolver only uses outgoing connections applicable at the current effective location. A known nonadjacent place gets 'You cannot get there directly from here' or equivalent. Do not implement automatic route following, teleportation, or fast travel as a side effect of destination recognition.
+
+Multiple publicly nameable outgoing connections matching the same direction or destination require clarification, even if only one is currently traversable. Do not use lock state, traversal predicates, or puzzle outcomes to choose between lexical matches. Compiler warnings should link to conflicts. Exclude unknown/concealed alternatives according to knowledge policy; a known blocked alternative does not become unknown merely because it is blocked.
+
+Known closed/disabled passages may still be attempted where the game's knowledge rules permit; execution gives the authored reason. Distinguish not visible, not yet known, disabled, blocked, locked, and unavailable from this side.
+
+Entering an enterable object is distinct from following a connection into a location. Resolve 'enter locker' from public candidates and ask if both interpretations remain plausible. Out first leaves the player's immediate enterable object when applicable; otherwise it uses an Out connection.
+
+Keep map dragging, axis/plane controls, snapping, coordinates, and map undo behavior. Clickable travel and typed travel must use identical runtime checks and turn rules.
+
+11. WORLD MODEL AND STANDARD CAPABILITIES
+
+Make ordinary behavior available through labeled properties. A basic locked-drawer puzzle must require no custom action and no hand-authored grammar.
+
+Retain and strengthen existing capabilities: portable, container, supporter, openable, lockable, wearable, readable, light source, scenery, and door.
+
+Add the capabilities needed for the standard actions below: switchable, edible, drinkable, and enterable. Keep climbability as an authored interaction or explicit connection unless a complete corresponding physical model is implemented. Do not add a checkbox whose runtime behavior is missing.
+
+Use author-facing wording such as:
+
+- Can be picked up.
+- Can contain objects.
+- Objects can be placed on it.
+- Can be opened / Initially open.
+- Can be locked / Initially locked / Unlocks with.
+- Transparent when closed.
+- Can be worn.
+- Can be read / Written text.
+- Can be switched on / Initially on.
+- Emits light / Light when on.
+- Can be eaten / Can be drunk.
+- Player can enter / Occupancy relation inside or on.
+- Scenery / Include in normal room listing.
+
+Distinguish state from capability. An openable object is not necessarily open. A light source is not necessarily emitting light. A scenery object can still be examined and have authored interactions.
+
+Objects may be both containers and supporters. Preserve inside and on placement independently. Closing an opaque box hides its interior contents, not the book resting on its lid.
+
+Every physical object and actor has one valid placement or explicit offstage/root state. Locations are graph roots; nonphysical authoring entities do not have placement. Reject illegal parents and cycles across the unified graph of object containment, support, actor possession, and actor occupancy. An actor cannot take their own enclosing object. Moving a container moves its descendants without rewriting each child's parent. Preserve nested carrying and distinguish accessible tools from tools sealed inside a carried box.
+
+Model player occupancy explicitly for enterable objects. Derive the effective room from the placement chain. Entering a chair, vehicle, or locker does not create an unrelated map location. Define inside versus on as authored occupancy, enforce entry/open/capacity requirements, and handle leaving. Ordinary room travel while inside an object requires leaving first unless an authored vehicle movement explicitly moves the occupied object. Moving an occupied object must move its occupants consistently. Do not implement an implicit vehicle simulation beyond these rules.
+
+Actor placement, inventory, and mutable typed properties must be supported consistently for the player and NPCs where exposed. NPC possessions can be publicly visible according to author settings without automatically being takeable. Give, show, ask, tell, and talk use that same actor model.
+
+Keep a simple capacity model: direct item-count capacity, with separate occupancy capacity if enterable behavior needs it. Explain units in the editor. Weight, volume, fluid simulation, combat statistics, and a physics engine are not required by this rewrite.
+
+Eating or drinking a configured consumable uses an explicit runtime state/placement change, participates in undo, and runs authored rules. It must not delete source definitions or corrupt references.
+
+12. PERCEPTION, LIGHT, AND KNOWLEDGE
+
+Centralize viewpoint-aware scope. An opaque closed container blocks sight and reach across its boundary. A transparent closed container permits sight and light but blocks physical access. An open container exposes eligible contents. Supporters do not hide their contents merely because they can also be closed as containers.
+
+Account for the player's viewpoint when inside an enterable object. Outside and inside are different perception domains. Do not implement darkness as a single room boolean divorced from containment.
+
+Ambient room light and enabled light sources determine illumination through the same containment/barrier model. A lit lamp sealed inside an opaque box does not light the room. A source behind transparent material can provide light where the model permits it. Separate light emission from whether an object is explicitly listed in room prose.
+
+Visibility conditions, concealment, and light need defined evaluation order and cycle protection. If visibility conditions would recurse through visibility itself, reject the cycle or evaluate a documented nonrecursive model with diagnostics. Do not risk infinite recursion or inconsistent scope between parser and engine.
+
+In darkness, retain explicitly permitted movement, accessible known carried-item manipulation, and known tactile interactions under documented rules. Do not reveal new visual nouns, permit reading without light, or expose hidden contents through all. Exits can have a visible author option for navigation in darkness.
+
+Knowledge is a record of legitimate observation/discovery, not a projection of the complete world definition. Remembering an entity does not expose its remote current state. Forgetting a topic and revealing an entity remain explicit authored effects.
+
+13. STANDARD ACTION LIBRARY
+
+Provide a central registry containing each action's stable ID, displayed name, grammar forms, role definitions, multiplicity policy, scope policy, turn cost, default checks, operation, reporting, and hook points. Document it for both developers and authors.
+
+Implement these as standard actions with useful default behavior:
+
+Observation and information:
+- Look, Examine, Inventory, Read.
+- Look in / Search containers: describe visible contents and authored search results; do not automatically discover every concealed object.
+- Look under and Look behind: support authored responses/reveals and a neutral default. No invented hidden compartments.
+
+Movement and occupancy:
+- Go by connection/direction/destination.
+- Enter an enterable object; Exit an occupied object.
+
+Possessions and placement:
+- Take, Take from, Drop.
+- Put inside, Put on.
+- Give, Show.
+- Wear, Take off.
+
+Object state:
+- Open, Close, Lock, Unlock.
+- Switch on, Switch off.
+- Eat, Drink.
+
+Conversation:
+- Talk to.
+- Ask about a known topic or explicit topic text.
+- Tell about.
+- Say quoted text, optionally addressed to a publicly identified target.
+
+General interactions:
+- Use, with an optional target as a distinct supported form.
+- Push, Pull, Turn, Touch, Listen, Smell, Taste, Knock, Attack, Cut, Climb.
+- Wait, including wait N turns as bounded repeated one-turn waits.
+
+General interaction verbs recognize the player's intent and expose ordinary rule hooks. Their default can be a specific neutral refusal or sensory response when no behavior is configured. Do not invent combat, injuries, a cutting simulation, or arbitrary puzzle solutions. Document exactly which verbs have automatic state-changing capabilities and which need authored effects.
+
+Use must not inspect hidden rules and select whichever operation solves a puzzle. If a project explicitly defines 'use key on door' as Unlock, it can do so through a visible interaction template. Otherwise ask what the player wants to do or use an authored response.
+
+Give requires a present eligible recipient and authored/default acceptance rules. Show keeps the item with its holder. Ask/Tell/Say deliver authored dialogue only. A neutral default response should not pretend an NPC actually knows an undisclosed fact.
+
+Speech must support the existing example's 'say "Meridian" to prism console'. Restricting all speech targets to characters would break this use. Permit configured objects to receive speech through ordinary rules.
+
+System commands are separate from world actions:
+- Help / Commands, Save, Restore, Undo, Redo, Restart, Again/g, Cancel.
+- Route file operations to the normal desktop dialogs and keep them turn-free.
+- Again repeats the last single world-action request with fresh validation. Preserve intended entity IDs for ordinary object actions. For movement, retain the semantic selector, such as north, so north followed by again resolves the north exit from the new room instead of reusing an obsolete exit ID. Named travel repeats its named selector under current scope; entering an object retains its intended target. Mark an entire bulk/sequence request as nonrepeatable, rather than accidentally retaining its last atomic member as the repeat target. System commands never become repeat targets. Explain when the last world request is not repeatable.
+- Recognize system commands before pending clarification interpretation, using the preservation/cancellation rules in section 8. Canceling a save/restore dialog preserves the current world and pending work.
+
+14. ACTION PIPELINE, RULES, AND REPORTS
+
+Preserve transactional execution and make the rule semantics explicit.
+
+Recommended pipeline:
+
+1. Validate the canonical action, actor, references, and role structure.
+2. Determine current knowledge, scope, and ability to attempt the action.
+3. Apply pure requirements and authored prohibitions.
+4. Execute a matching replacement handler or the default behavior, including any permitted implicit prerequisite actions.
+5. Run after-success rules against the resulting draft.
+6. Select and assemble the default or authored response.
+7. Drain immediate events and advance consumed turns according to the event policy.
+8. Refresh legitimate observations, validate invariants, and commit state/output atomically.
+
+Internally distinguish validation errors, clarification, ordinary world refusal, successful action, and internal execution failure. The transcript and test runner must not collapse these into a single boolean.
+
+Support these author-facing rule categories:
+
+- Requirements: when applicable, require a condition; otherwise show a refusal.
+- Instead: replace an operation with explicit effects and an explicit success/refusal outcome.
+- After success: add consequences after a successful action.
+- Response: replace or append the ordinary report without replacing the operation.
+- Events: game start, entering/leaving a location, each consumed turn, and named events.
+
+Separate 'When this rule applies' from 'What must be true'. A requirement is not a trigger that runs only when its own requirement is already true.
+
+Requirements are pure. Do not display effect controls that runtime ignores. Detect existing Check rules with ignored effects during migration and give an actionable diagnostic; do not invent their intended meaning or silently throw them away.
+
+Order rules by explicit priority, author order, and stable ID as final tie-breaker. Define first-match replacement behavior and whether multiple after rules run. Use all applicable after-success rules in deterministic order unless an explicit stop control says otherwise. Warn about overlapping replacement rules, but keep intentional ordered alternatives possible.
+
+Default reporting must be separable from mutation. An author can replace 'You open the drawer' with a custom description while still using standard Open checks and state changes. Provide Replace default response and Append response controls. Prevent accidental duplicate standard/custom success reports.
+
+Description variants use ordered condition groups with replace/append behavior. Message insertion uses a safe token picker for entity names, typed variables, and action roles. No eval, JavaScript, executable expressions, or arbitrary file/network access.
+
+15. IMPLICIT ACTIONS, REFUSALS, AND TRANSACTIONS
+
+Use a deliberately small default implicit-action policy:
+
+- Traversing a closed, unlocked door may implicitly Open it.
+- Locked doors do not automatically select a key, unlock, or solve a prerequisite puzzle.
+- Do not silently take, remove clothing, eat, leave an occupied object, or manipulate unrelated items to make a requested action succeed.
+
+Every implicit action uses the same requirements, replacement handlers, after rules, and reporting as the explicit action. Never flip door.open directly from Go. Bound implicit-action nesting and detect recursive cycles.
+
+An implicit prerequisite belongs to the parent transaction and consumes no additional turn beyond the parent's normal cost. Show an understandable parenthetical report when appropriate.
+
+If the parent cannot complete after an implicit prerequisite, roll back provisional prerequisite state and success output, then process the parent refusal consistently. Do not leave a door unexpectedly open because a later movement check failed. Authored requirement checks should run early enough to avoid unnecessary prerequisites. Recheck required postconditions: a custom Open replacement that reports success without actually opening the door does not authorize walking through it.
+
+Author-invoked actions are subordinate operations in the current transaction. They use the ordinary checks, handlers, after rules, and reports but create no separate turn advancement, event-drain boundary, or history checkpoint. The outer action's turn cost controls elapsed time. A refused subordinate operation rolls back its own provisional changes. An implicit prerequisite propagates that refusal to its parent. An explicit Invoke action effect offers a no-code on-refusal choice: stop the calling operation with a refusal, or keep the surrounding operation and report/ignore the subordinate refusal as configured. Within an event, refusal may stop that event handler but must not silently roll back an already successful initiating action. Internal errors still roll back the entire outer transaction. Nested actions may enqueue events, which the outer dispatcher drains in order. System commands are never invocable game effects.
+
+On an internal exception or invariant failure, roll back state, RNG, events, time, and buffered narrative. Provide a safe player message and a detailed designer trace.
+
+An ordinary world refusal discards provisional operation changes, then applies the project's failed-attempt turn policy. Due events from that consumed time may still happen and must commit consistently. A zero-cost parser failure or clarification cannot trigger turn events.
+
+16. TURNS, EVENTS, AND DETERMINISM
+
+Keep the existing default that Look, Examine, Inventory, and Read are free. Make other observation defaults explicit in the registry; use zero turns for Look in/under/behind and one turn for active Search. Movement, manipulation, conversation, general physical interactions, and Wait cost one turn unless explicitly configured otherwise. Show the configured cost in author-facing action settings.
+
+Keep the project setting controlling whether recognized failed attempts cost a turn. Parsing failures, unknown references, cancellation, clarification, empty bulk sets, and system commands always cost zero.
+
+Multi-turn custom actions must process every consumed turn, with due events and turn events at each tick. Do not jump the clock and run a single turn-end event. Stop further ticks on an ending. Wait N is N explicit one-turn waits with bounded input, so it has the same event behavior as typing wait repeatedly.
+
+Immediate enter/leave/named events use a deterministic FIFO work queue, with documented priority/order where applicable. Movement queues leave before enter and supplies from/to/actor bindings. These events observe the committed draft position; requirements are used to prevent movement.
+
+Scheduled event instances have stable identifiers, due turns, deterministic insertion sequence, and serializable bindings. Sort by due turn, explicit priority, then insertion order. Cancellation must distinguish an event definition from a particular scheduled instance where necessary.
+
+Define Delay 1 as the next consumed turn after the scheduling action completes. Zero-turn observations do not advance it. For an event scheduled within an event tick, anchor relative delays to that tick. Use an explicit immediate event effect rather than an ambiguous delay-zero loop. Test scheduling from normal actions, implicit actions, and events.
+
+Keep bounded rule/effect/event execution, initially the existing 100 work-unit transaction budget or a justified documented replacement. Count nested work. Exhaustion rolls back the transaction and provides a useful diagnostic rather than hanging.
+
+Use stored seeded RNG for random branches. Undo, redo, save, restore, and replay must preserve it. An ending stops its enclosing effect/rule list and all remaining queued commands/events. If ending occurs during the main operation or its after rules before turn advancement, charge that explicit action's configured cost but dispatch no further events. If ending occurs during a consumed-turn tick, commit time through that tick and skip remaining ticks. If an immediate event ends the game before ticking begins, charge the initiating action's configured cost and dispatch no further events. A zero-cost action remains zero-cost. These are explicit exceptions to ordinary multi-turn processing; test each ending point.
+
+17. FULLY NO-CODE DESIGNER
+
+The author must never need to type source code, JSON, regular expressions, grammar syntax, internal IDs, parameter keys, event IDs, or pipe-delimited command arguments to build a game.
+
+Use the existing interface style and strengthen its editors.
+
+Pop-out player window:
+- Add an obvious Pop Out Player button to the embedded player toolbar, with a tooltip. It opens the complete player in a separate, nonmodal native Electron window. The author can continue using the designer and move the player onto another monitor.
+- Include the transcript, command entry, inventory, rotatable map, and normal play controls such as save/restore, undo/redo, and restart. Reuse the same player components and styling; make their layout respond to the available window size. Title the window with the game's title and Player.
+- Detaching changes the presentation of the existing play session. Keep the authoritative session in the main process and retain its identity, compiled snapshot, world state, transcript, discourse, pending clarification, suspended commands, RNG, events, and undo/redo history. Do not start a second adventure, reset progress, or rerun startup events.
+- While detached, replace the embedded player with a compact message and Bring Player to Front / Return Player to Designer controls. Keep only one active player input surface. Repeated Pop Out or Bring to Front requests focus the existing window rather than opening duplicate windows.
+- Provide Return to Designer in the player window. Returning, or closing the player window with its normal close button, reattaches the live session to the embedded player and restores command focus. Closing this window does not end the game or quit ElseWhen.
+- Preserve unfinished command text, command history, and pending questions across detaching and reattaching. Preserve transcript position and map camera/panel state where applicable. A presentation change consumes no turn and creates no world-history checkpoint.
+- Synchronize the active player's view and the designer's playtest inspector from the same session updates. Transfer views at a safe action boundary when necessary; do not cancel, replay, or duplicate an in-flight action, queued clause, scheduled event, or effect. Dispose old renderer subscriptions and keyboard handlers when a view is detached or closed.
+- Keep play bound to its existing compiled snapshot while the author edits. Applying updated project content uses the existing explicit restart/recompile workflow, with a visible indication when the running snapshot differs from the edited project. Popping out must not introduce live mutation of runtime definitions.
+- Support resizing, minimizing, maximizing, and moving between monitors. Remember useful window bounds as a local preference, and clamp restored bounds to an available display so a disconnected monitor cannot hide the window. This preference is not part of the project or saved game.
+- Use restricted player IPC and normal context isolation/preload protections for the new renderer. Explicitly authorize its supported operations without weakening sender checks for other windows or granting exported player sessions designer-only controls.
+- Closing the main application follows normal unsaved-project/session and quit handling, then closes its player window. A canceled quit leaves both views and the current session intact. Do not leave an orphaned window or process.
+
+World navigation:
+- Change the top-left Project tree label to World Explorer.
+- Give the plus button an Add Entity tooltip and use Add Entity for the dialog title.
+- Rename Actions to Custom Actions.
+- Provide an accessible Vocabulary view and Rules & Events view.
+- Built-in actions are available automatically and are browsable without creating project entities for each one.
+
+Entity vocabulary:
+- Use chips for aliases, noun phrases, adjectives, and plurals, with helpful examples.
+- Explain that the display name is recognized automatically.
+- Put a small help control next to terminology that needs explanation.
+- Use 'Alternative names players can type. Enter a name and press Enter to add it.' or equivalent for aliases.
+- Keep author tags visibly distinct from player vocabulary.
+
+Location metadata:
+- Label Category as Location Type, with optional searchable choices and Add type.
+- Region is an optional larger grouping with select/create controls.
+- Neither setting automatically introduces mechanics.
+- Label the icon selector Map Icon and color controls Map Color, and show icon previews.
+- Preserve existing map positioning behavior and keep it independent of travel.
+
+Object behavior:
+- Provide a readable capabilities/properties editor with conditional controls.
+- Unlocks with uses an entity picker, not an ID.
+- Starting placement uses entity/relation selectors.
+- Contents and supported objects are inspectable from the parent entity.
+- Requirements and responses can be configured from the object's editor.
+
+Vocabulary view:
+- Show the standard verbs and examples ElseWhen already understands.
+- Let authors add verb synonyms mapped explicitly to an action/form.
+- Show project noun vocabulary and conflicts.
+- Explain that sample/help sentences are not automatically executable grammar.
+- Try a command displays the resulting interpretation without changing the world unless the author chooses Execute.
+
+18. VISUAL CUSTOM ACTIONS AND RULE AUTHORING
+
+Custom Actions are optional project-specific interactions such as attune crystal, ring bell, or project consciousness. Standard Open, Take, and Go never require them.
+
+A guided custom-action editor should support:
+
+1. Display name and author description.
+2. A supported sentence shape selected from a menu.
+3. Verb phrases and synonyms entered as chips.
+4. Role slots with readable labels and typed selection constraints.
+5. Optional exact bound phrases for a specific entity or interaction.
+6. Requirements, effects, response, visibility/availability, and turn cost.
+7. A generated command preview and Try a command control.
+
+Provide sentence shapes for: no target; one target; target with tool; item in/on destination; item to recipient; target plus topic/text; quoted speech to target; and numeric argument where a declared action needs one.
+
+A visual word-and-slot builder can provide alternate forms. Authors insert literal word chips and selectable role chips; the compiler generates grammar records. Do not require authors to type angle-bracket placeholders, identifiers, regular expressions, or a mini-language. Typed source representations may exist internally.
+
+Example visible to an author:
+
+Interaction: Ring bell
+Ways to say it: ring [Thing], sound [Thing]
+Thing: Chapel Bell, or objects of a chosen Bell type
+When allowed: Player is in Chapel
+What happens: Set Caretaker alerted to Yes
+Response: The bell echoes through the empty corridors.
+
+The bracketed parts above represent UI chips, not syntax the author must type. A bound alternate phrase such as 'pull bell rope' can explicitly map to the same action and target.
+
+Validate overlapping synonyms and command forms. Do not silently let a new phrase shadow a standard verb. Offer concrete resolution choices such as narrow the targets, change the phrase, or intentionally configure a documented override. Essential system commands remain reserved.
+
+For special behavior on an ordinary action, expose a contextual editor:
+
+When player -> Opens this object
+If -> Required conditions
+Then -> Reveal object / Change value / Move object / Schedule event / Show response
+
+This edits the same underlying rule as the global Rules & Events editor. Do not create two competing rule systems.
+
+Provide a property registry with named typed definitions. Conditions/effects use entity, property, action-role, event, and ending pickers. Booleans use switches; numbers use numeric inputs; entity references use entity pickers; enums use choices. Restrict choices to valid combinations and explain invalidated references when a definition changes.
+
+Condition groups support all, any, and not through controls. Effects support existing useful operations plus required typed operations: move/place, change state, set/increment values, reveal, forget topic, enable/disable connection, schedule/cancel event, invoke a bounded standard action, choose a seeded random branch, show text, and end game. Invocation of another action must obey the same pipeline and recursion limits, not bypass requirements.
+
+Named events and endings are named records with generated stable IDs. Authors select or create them by name. Preserve and improve the existing rule builder rather than replacing it with a text box.
+
+19. SAVE, RESTORE, UNDO, AND REPEAT STATE
+
+Retain project source recovery/backups and versioned portable game saves.
+
+A runtime save must contain enough state to resume consistently: placements, actor/object properties, connection states, variables, knowledge/observations, turn, pending event instances, RNG, ending, transcript, discourse/pronouns, and repeat-action data. Include a valid pending clarification and its suspended command remainder if saving while a question is active.
+
+Do not serialize active execution stacks, file dialogs, promises, or a busy flag as resumable work. Take saves at safe action boundaries. Restoring a pending question displays it again and waits for explicit input; it does not execute the suspended sequence immediately. Revalidate all stored action/grammar/entity references against the exact game/runtime version.
+
+Undo/redo operate on committed explicit world-action checkpoints, including meaningful zero-turn actions that alter observation/discourse state. Each bulk member and each sequence action is separately undoable. Parser failures and unanswered questions do not create world-history entries.
+
+Undo/redo cancel current pending clarification and queued clauses, then restore the selected world checkpoint, transcript boundary, discourse, repeat data, RNG, and events. History checkpoints exclude transient pending questions and command queues; ensure they remain cleared after restoration. This deliberate cancellation policy differs from restoring a portable save that explicitly contains a pending question. Document and test it.
+
+Portable saves need not contain undo/redo stacks. Successful Restore clears the current history and establishes the restored state as the new baseline. A rejected or canceled restore changes nothing. Subsequent actions in the restored session create a fresh undo/redo history.
+
+Redo restores stored results; it does not rerun random effects or reinterpret old English against new state. A new committed action after undo clears the redo branch.
+
+Keep input command history separate from world history. Restart constructs fresh world/discourse state and runs initial events exactly once. Debug mutations remain marked, undoable, and unavailable in exported player sessions.
+
+20. COMPILATION, VALIDATION, AND MIGRATION
+
+Version the authoring schema, compiled runtime semantics, package format, and save format deliberately. The reviewed formats are mostly version 1; do not merely reuse that version after incompatible changes.
+
+Compilation order:
+
+1. Validate base structure, IDs, and template graph.
+2. Resolve template inheritance safely and deterministically.
+3. Validate effective capabilities/properties, placement, connections, rules, role bindings, and event references.
+4. Compile grammar/vocabulary and detect conflicts or unbound roles.
+5. Build immutable runtime data/indexes and strip editor-only information.
+6. Produce a deterministic content hash and package incorporating the runtime semantics version.
+
+Never reject an inherited container capability solely because it is absent from the raw object's local list. Never allow a template cycle or invalid override to slip through expansion.
+
+Validate grammar/action consistency, missing targets, incompatible role types, property value types, impossible placements, containment cycles, open-and-locked inconsistencies, missing keys/doors, duplicate direction ambiguity, unreachable areas, and dangerous recursive event/action configurations. Separate errors that prevent export from intentional-world warnings.
+
+Migration must operate on a copy. Opening an old project must not silently overwrite the original. Preserve stable entity/action/rule IDs where feasible, text, aliases, map layout, connections, templates, conditions, effects, and authored order.
+
+Migrate action-role changes throughout condition/effect bindings, tests, and event captures. Migrate old direction strings into recognized direction data when unambiguous; preserve unusual vocabulary as a custom exit alias and flag uncertain conversions.
+
+Preserve old custom actions using structured forms derived from their actual parameters and supported legacy behavior where possible. Maintain the old pipe form only as a deterministic compatibility path for migrated projects when needed, never as the new authoring interface. Show an actionable migration item so the author can adopt normal forms.
+
+Descriptive AI examples must not be presented as automatically compiled grammar. Keep them as help/test material. Convert only forms that can be mechanically and unambiguously represented; flag the others for author review with a direct link to the action editor.
+
+Retain ignored or unsupported legacy rule data in a recoverable migration record and block misleading export until it is resolved. Do not silently reinterpret Check effects or fallback semantics. Produce a concise migration report listing conversions and decisions requiring attention.
+
+Keep old project compatibility separate from old saved-game compatibility. An old save must match supported game identity, content hash, and runtime semantics. If safe conversion is unavailable, explain that it belongs to an older runtime and leave it intact. Do not claim compatibility based only on entity IDs.
+
+Keep exported games free of credentials, editor history, source notes, private test expectations, and machine paths. Runtime grammar necessary for play is exported. Retain safe package reading, file size limits, and schema validation. The package contains puzzle logic; knowledge filtering governs presentation, not encryption of the archive.
+
+21. DESIGNER TESTING WORKSPACE
+
+Extend the existing test editor and playtest diagnostics into a practical parser debugger.
+
+For a test command, show:
+
+- Recognized verb and grammar form.
+- Parsed roles and noun phrases.
+- Candidate entities and why they were considered in designer mode.
+- Selected entities or the requested clarification.
+- Canonical action and spatial relation.
+- Requirements and rules evaluated, in order.
+- Final result: success, world refusal, clarification, parse failure, or internal error.
+- Consumed turns, output, and state changes.
+
+The normal author view uses names and readable explanations. Internal IDs can appear in an optional developer diagnostic view, but are never required inputs.
+
+Allow authors to save tests entirely through controls:
+
+- Input command or sequence of inputs, including clarification answers.
+- Expected action and selected entities.
+- Expected clarification or refusal.
+- Expected location, inventory, state/property/variable values, turn count, and ending.
+- Optional exact or contains text assertions.
+
+Do not treat every expected refusal or question as a failing test. Keep parser interpretation tests separate from full gameplay scenarios where helpful. Run each scenario from a defined isolated initial state or saved fixture. Reset RNG and discourse consistently.
+
+Add a small reference adventure that can be built solely in the designer: a room, courtyard, maintenance room, locked drawer, brass key, hidden photograph, shared door, lamp, transparent display case, and caretaker. Use it to test standard behavior, plus one custom interaction such as ring bell. Update The Folded Horizon and its walkthrough as an additional migration/integration fixture.
+
+22. REQUIRED ACCEPTANCE COVERAGE
+
+Use meaningful table-driven parser tests, engine integration tests, persistence tests, and a small set of UI journeys. Avoid tests that merely restate implementation details. At minimum cover the following behaviors.
+
+Language and reference tests:
+
+1. take locket, get pendant, and pick up the brass locket resolve to the same configured item.
+2. take key banana is rejected without taking the key.
+3. take key asks when brass and iron keys are equally plausible; brass selects the brass key.
+4. Numeric choice 2 selects the second ID even if both candidates have the same display name. 'Which two coins?' accepts '1 and 3' and validates distinct IDs and cardinality.
+5. unlock drawer asks for a tool; brass key completes the operation.
+6. examine portrait replaces a pending unlock question and does not become a key name.
+7. unlock drawer with key followed by open it targets the drawer.
+8. take key and photograph followed by drop them refers to the two selected objects.
+9. A stale pronoun cannot act on an invalid or undiscovered replacement entity.
+10. Case, punctuation, multiword aliases, apostrophes, and quoted names work as documented.
+11. Man in Black and Salt and Pepper are not broken by naive splitting.
+12. say "wait; then go north" to caretaker is one speech action.
+13. ask caretaker about north and south preserves the topic.
+14. Every standard grammar form maps to a registered executable action.
+15. Worlds exceeding the old 150-entity or 100-exit/topic context limits retain all legitimate vocabulary.
+16. Exact remote names never cause a different local object to be selected.
+17. Suggestions and ambiguity choices do not expose unknown hidden entities.
+
+World and action tests:
+
+18. A GUI-created drawer/key/photo puzzle works without custom actions.
+19. Take statue recognizes the target and reports its fixed-object restriction.
+20. Put photograph in box and put photograph on box produce different placements.
+21. Closing a container/supporter hides its opaque interior but not its supported contents.
+22. A visible coin behind closed transparent glass is nameable but unreachable.
+23. A light in a closed opaque container does not illuminate the room; opening it changes illumination.
+24. Nested carrying does not make a sealed-away key available as a tool.
+25. NPC-held possessions have defined visibility and permission; Give and Show behave differently.
+26. NPC typed property conditions/effects work and survive saves.
+27. Enter and Exit an object update occupancy and effective room consistently.
+28. A moved occupied object preserves occupants and valid placement.
+29. Eating/drinking a consumable is reversible and does not delete its definition.
+30. Use does not infer the hidden correct solution from key mappings or rule outcomes.
+31. An authored response can replace the Open message without replacing standard Open behavior.
+32. Known but unavailable objects do not reveal live remote state through Examine.
+
+Movement tests:
+
+33. n, northeast, ne, up, down, in, and out use explicit direction metadata.
+34. go to courtyard works with an exit internally named WaitToCourt when naming is allowed.
+35. A secret destination whose name is not public cannot be selected by guessing its name.
+36. go through rusty door uses the applicable outgoing connection and shared door state.
+37. Moving map nodes changes no travel semantics.
+38. A known nonadjacent destination does not teleport or invoke automatic routing.
+39. Two publicly nameable outgoing exits with the same direction require clarification even when one is locked and the other open.
+40. Implicit Open runs Open requirements and after rules; a blocking requirement prevents Go.
+41. A failed parent Go rolls back provisional implicit Open effects/output.
+
+Sequences, time, and state tests:
+
+42. open drawer then take photograph resolves the second clause after the first.
+43. A refusal stops subsequent then clauses while retaining earlier successes.
+44. A question suspends a sequence; an explicit answer resumes it; replacement/cancel discards it.
+45. take all except brass key excludes the intended item and no hidden contents leak in.
+46. Bulk selection is frozen; items revealed by an earlier member are not added automatically.
+47. Take all does not separately empty a selected portable container.
+48. Explicit lists report per-item refusals under the defined continuation policy.
+49. Bulk members revalidate after earlier events change the scene.
+50. Over-limit input fails explicitly without truncated or unintended execution.
+51. Parser failure, clarification, and system commands consume zero turns.
+52. Recognized refusal follows failedAttemptsCostTurn.
+53. A two-turn custom action processes both ticks and due events in stable order.
+54. Delay 1 follows the documented action/event scheduling anchors.
+55. Event/action recursion and invalid containment roll back state, output, RNG, and time.
+56. Ending stops remaining commands and event processing as defined.
+57. Undo/redo restore world state, transcript, pronouns, repeat state, and RNG correctly.
+58. Typing Save during clarification preserves the question; restore displays it without automatically executing it. Failed restore changes nothing; successful restore establishes a new history baseline.
+59. Undo cancels pending work and applies to the previous committed action.
+60. Replay from the same seed produces the same logical state and authored reports. North followed by Again resolves from the new room. Bulk/sequence requests do not leave their last member as an accidental repeat target.
+
+Authoring, migration, and integration tests:
+
+61. Build the locked-drawer scenario through UI controls alone, export it, and solve it offline.
+62. Build ring bell through the custom-action wizard, add an alternate form, and test its effect.
+63. Entity-local rules and the global rule editor modify the same records.
+64. Vocabulary conflicts produce actionable author feedback without silent precedence changes.
+65. Inherited capabilities are resolved before capability-dependent validation.
+66. A schema-1 project migrates with stable references, text, map positions, and recoverable warnings.
+67. The Folded Horizon speech interaction and intended ending remain playable or have explicit resolved migration changes.
+68. Settings migration preserves recent projects and removes only obsolete app-owned AI data.
+69. Incompatible saves fail clearly and leave the original file intact.
+70. Packaged authoring, play, export, save/restore, and testing work with network access blocked and no API key.
+71. No production AI dependency, provider IPC, model setting, API-key control, or remote interpretation path remains.
+72. Player UI and map do not leak designer-only rules, properties, or undiscovered names.
+73. Pop Out Player opens a separate native window with the complete player while the designer remains usable; a second request focuses that same window.
+74. Commands, clarification answers, save/restore, and undo/redo in the detached window use the original session and are reflected in designer diagnostics without duplicate execution.
+75. Detaching and returning preserve progress, transcript, unfinished input, pronouns, pending questions, suspended commands, RNG, events, and history. They consume no turn and do not rerun startup events.
+76. Closing the player window returns the live player to the designer. Detaching again resumes the same session. Closing or canceling application quit follows the defined lifecycle without orphaned windows.
+77. Repeated window transfers and a transfer requested during an action do not duplicate subscriptions, keyboard handling, command execution, or events. The new window retains restricted IPC access.
+78. Resizing and multi-monitor placement keep the player usable; restoring window bounds after a display is disconnected keeps the window on an available screen.
+
+23. IMPLEMENTATION ORDER AND COMPLETION
+
+Use this sequence so the system remains coherent:
+
+Phase 1: Define versioned domain/action/parser/session contracts, central world-query policies, and migration fixtures. Remove AI integration while maintaining a working local command path.
+
+Phase 2: Implement compiled vocabulary, lexer/grammar, noun resolution, directions/destinations, discourse, clarification, diagnostics, lists, and sequences. Keep the engine boundary authoritative.
+
+Phase 3: Complete capability behavior, placement/actor support, perception, the standard action registry, rule/report separation, implicit actions, turns/events, and consistent session persistence.
+
+Phase 4: Build no-code vocabulary/custom-action/property/rule controls, contextual object behavior editors, the test workspace, and the detachable player window with shared-session lifecycle. Apply the scoped labeling/help improvements above.
+
+Phase 5: Finish migrations, update examples/docs, run integrated and packaged verification, fix failures, and report the completed behavior and any concrete remaining limitations.
+
+Do not stop at a phase boundary merely to ask whether to continue. Use sensible implementation choices within this specification. Record material tradeoffs or unavoidable compatibility decisions. If a real blocker prevents a required behavior, identify it precisely rather than replacing the feature with a silent stub.
+
+Run the applicable existing repository checks, including type checking, lint, unit/integration tests, example validation, build, selected end-to-end journeys, and a packaged offline smoke test where the environment permits. Report exactly what ran, what passed, and any checks that could not run. Do not claim Windows packaging or offline runtime testing from static inspection alone.
+
+Update developer architecture and engine-semantics documentation, author-facing help, command reference, migration notes, and example walkthroughs. Include clear lists of automatic behaviors, authored-only interaction hooks, grammar forms, scope rules, turn policy, and known limits.
+
+Keep this rewrite focused. Voice/dictation normalization, speech recognition, multilingual grammar, unrestricted natural-language chat, automatic long-distance route following, fluid/weight simulation, and a new combat system are future features. They are not required here.
+
+The finished result should let an author build and test a substantial text adventure by creating locations, connections, objects, characters, vocabulary, conditions, and consequences entirely through the GUI. The player should experience a predictable traditional IF parser with helpful questions and dependable world behavior, running completely locally.

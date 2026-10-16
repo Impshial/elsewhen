@@ -1,7 +1,7 @@
 import { Select } from './components';
 import { ScalarInput } from './RuleEditor';
-import type { Scalar } from '../../../../packages/domain/src/index';
-import { useEffect, useRef, useState } from 'react';
+import { actionCatalog, type Scalar } from '../../../../packages/domain/src/index';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { SessionView } from '../main/session';
 import { Button, Badge, Icon, Section } from './components';
 import { WorldMap } from './WorldMap';
@@ -13,7 +13,9 @@ export function Player({
   onGameView,
   onSettings,
   changed = false,
+  nativePlayer = false,
 }: {
+  nativePlayer?: boolean;
   changed?: boolean;
   session: SessionView;
   gameView: boolean;
@@ -23,24 +25,62 @@ export function Player({
   const { view } = session,
     setSession = useEditor((s) => s.setSession),
     toast = useEditor((s) => s.setToast),
-    [input, setInput] = useState(''),
+    [input, setInput] = useState(session.presentation.input),
     [busy, setBusy] = useState(false),
-    [history, setHistory] = useState<string[]>([]),
-    [historyIndex, setHistoryIndex] = useState(0),
+    [history, setHistory] = useState<string[]>(session.presentation.history),
+    [historyIndex, setHistoryIndex] = useState(session.presentation.historyIndex),
     [inspector, setInspector] = useState('Rule trace'),
-    [selected, setSelected] = useState(view.location.id),
-    [inventoryId, setInventoryId] = useState(''),
-    [fontSize, setFontSize] = useState(Number(localStorage.getItem('elsewhen-font-size') ?? 19)),
-    [follow, setFollow] = useState(true),
-    [search, setSearch] = useState('');
+    [selected, setSelected] = useState(session.presentation.selected || view.location.id),
+    [inventoryId, setInventoryId] = useState(session.presentation.inventoryId),
+    [fontSize, setFontSize] = useState(
+      nativePlayer
+        ? session.presentation.fontSize
+        : Number(localStorage.getItem('elsewhen-font-size') ?? 19),
+    ),
+    [follow, setFollow] = useState(session.presentation.follow),
+    [search, setSearch] = useState(session.presentation.search);
   const transcript = useRef<HTMLDivElement>(null),
-    commandInput = useRef<HTMLInputElement>(null);
+    commandInput = useRef<HTMLInputElement>(null),
+    previousLocation = useRef(view.location.id);
+  useLayoutEffect(() => {
+    if (transcript.current) transcript.current.scrollTop = session.presentation.scrollTop;
+  }, []);
+  const presentation = () => ({
+    input,
+    history: history.slice(-1000),
+    historyIndex,
+    selected,
+    inventoryId,
+    fontSize,
+    follow,
+    search,
+    scrollTop: transcript.current?.scrollTop ?? 0,
+  });
+  useEffect(() => {
+    if (!nativePlayer) return;
+    void host('playerPresentation', presentation()).catch(() => {});
+  }, [input, history, historyIndex, selected, inventoryId, fontSize, follow, search, nativePlayer]);
+  useEffect(() => {
+    if (!session.detached && !nativePlayer) {
+      const p = session.presentation;
+      setInput(p.input);
+      setHistory(p.history);
+      setHistoryIndex(p.historyIndex);
+      setSelected(p.selected || view.location.id);
+      setInventoryId(p.inventoryId);
+      setFontSize(p.fontSize);
+      setFollow(p.follow);
+      setSearch(p.search);
+      if (transcript.current) transcript.current.scrollTop = p.scrollTop;
+    }
+  }, [session.detached]);
   useEffect(() => {
     if (follow && transcript.current)
       transcript.current.scrollTop = transcript.current.scrollHeight;
   }, [session.transcript.length, follow]);
   useEffect(() => {
-    setSelected(view.location.id);
+    if (previousLocation.current !== view.location.id) setSelected(view.location.id);
+    previousLocation.current = view.location.id;
   }, [view.location.id]);
   async function control(
     method: 'undo' | 'redo' | 'restart' | 'saveGame' | 'loadGame' | 'exportTranscript',
@@ -89,8 +129,27 @@ export function Player({
       commandInput.current?.focus();
     }
   }
+  const interpreted = session.interpretation;
+  const interpretedActionName =
+    interpreted?.kind === 'resolved' && session.snapshot
+      ? actionCatalog(session.snapshot).find((a) => a.id === interpreted.command.actionId)?.name
+      : '';
   const selectedNode = view.nodes.find((n) => n.id === selected),
     item = view.inventory.find((e) => e.id === inventoryId) ?? view.inventory[0];
+  if (session.detached && !nativePlayer)
+    return (
+      <div className="detached-placeholder">
+        <Icon name="external" size={32} />
+        <h2>Game Player is open in its own window</h2>
+        <p>Continue editing your world while the same playtest runs.</p>
+        <div className="row">
+          <Button onClick={() => void host('focusPlayer', null)}>Bring to front</Button>
+          <Button onClick={() => void host('returnPlayer', session.presentation).then(setSession)}>
+            Return to designer
+          </Button>
+        </div>
+      </div>
+    );
   return (
     <div className={`player-workspace ${gameView ? 'game-view' : 'playtest-view'}`}>
       <div className="play-column">
@@ -109,6 +168,16 @@ export function Player({
             </h1>
           </div>
           <div className="row">
+            <Button
+              icon="external"
+              onClick={() =>
+                void host(nativePlayer ? 'returnPlayer' : 'detachPlayer', presentation()).then(
+                  setSession,
+                )
+              }
+            >
+              {nativePlayer ? 'Return to designer' : 'Open Game Player'}
+            </Button>
             {session.debug && (
               <Button icon={gameView ? 'rules' : 'external'} onClick={() => onGameView(!gameView)}>
                 {gameView ? 'Show debugger' : 'Game view'}
@@ -157,6 +226,12 @@ export function Player({
           onScroll={() => {
             const el = transcript.current!;
             setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 70);
+            if (nativePlayer)
+              void host('playerPresentation', {
+                ...presentation(),
+                scrollTop: el.scrollTop,
+                follow: el.scrollHeight - el.scrollTop - el.clientHeight < 70,
+              }).catch(() => {});
           }}
         >
           {session.transcript
@@ -221,7 +296,7 @@ export function Player({
             <span>Awaiting clarification</span>
             {session.pending.candidates.map((c, i) => (
               <Button key={c.id} variant="outline small" onClick={() => void submit(String(i + 1))}>
-                {view.known.find((e) => e.id === c.id)?.name ?? String(i + 1)}
+                {c.label}
               </Button>
             ))}
             <Button
@@ -293,6 +368,9 @@ export function Player({
           )}
         </form>
         <div className="player-foot">
+          {session.showCommandHints && (
+            <small className="hint">HELP · LOOK · INVENTORY · AGAIN</small>
+          )}
           <span>
             <i className={`status-dot ${busy ? 'amber' : ''}`} />
             {busy
@@ -436,24 +514,60 @@ export function Player({
             </nav>
             <DebugControls session={session} />
             <div className="debug-content">
+              {session.interpretation && (
+                <div className="interpretation-summary">
+                  <h4>
+                    {session.interpretation.kind === 'resolved'
+                      ? 'Grammar matched'
+                      : session.interpretation.kind === 'diagnostic'
+                        ? 'Interpretation stopped'
+                        : 'Clarification needed'}
+                  </h4>
+                  {session.interpretation.kind === 'resolved' ? (
+                    <>
+                      <p>{interpretedActionName}</p>
+                      {Object.entries(session.interpretation.command.phrases).map(
+                        ([role, phrase]) => (
+                          <p key={role}>
+                            <strong>{role}</strong> · “{phrase.text}”
+                          </p>
+                        ),
+                      )}
+                    </>
+                  ) : (
+                    <p>{session.interpretation.message}</p>
+                  )}
+                </div>
+              )}
               {session.last ? (
                 <>
                   {inspector === 'Intent' ? (
                     <>
                       <span className="eyebrow">VALIDATED INTERPRETATION</span>
-                      <p className="hint">
-                        Prompt elsewhen-intent-v1 · {session.latency} ms
-                        {session.usage
-                          ? ' · ' +
-                            session.usage.input +
-                            ' input / ' +
-                            session.usage.output +
-                            ' output tokens'
-                          : ''}
+                      <p className="hint">Local grammar · deterministic resolution</p>
+                      <p>
+                        {session.last.success
+                          ? 'Action succeeded'
+                          : session.last.committed
+                            ? 'Action refused'
+                            : 'Internal validation failed'}
                       </p>
-                      <pre>{JSON.stringify(session.last.action, null, 2)}</pre>
-                      <h4>Public parser context</h4>
-                      <pre>{JSON.stringify(session.context, null, 2)}</pre>
+                      {Object.entries(session.last.action.args).map(([role, value]) => (
+                        <p key={role}>
+                          <strong>{role}</strong> →{' '}
+                          {view.known.find((e) => e.id === value)?.name ?? String(value)}
+                        </p>
+                      ))}
+                      <details>
+                        <summary>Technical details</summary>
+                        <pre>
+                          {JSON.stringify(
+                            { action: session.last.action, context: session.context },
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </details>
                     </>
                   ) : inspector === 'Rule trace' ? (
                     <>
